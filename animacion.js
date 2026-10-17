@@ -1,4 +1,4 @@
-﻿const modulo = {
+const modulo = {
   titulo: "Módulo 1",
   descripcion: "Elige un subtema para ver su información, sus fórmulas y cómo se aplican.",
   subtemas: [
@@ -138,15 +138,15 @@
     }
   ]
 };
-
+ 
 /* ============================================================
    A PARTIR DE AQUÍ NO NECESITAS CAMBIAR NADA
    ============================================================ */
 const $ = (id) => document.getElementById(id);
 const vistaIndice = $("vista-indice");
 const vistaDetalle = $("vista-detalle");
-
-
+ 
+ 
 // Lluvia de fórmulas matemáticas (puedes agregar o quitar fórmulas de esta lista)
 const formulas = [
   "E = mc²", "a² + b² = c²", "∫ x² dx = x³/3", "e^(iπ) + 1 = 0",
@@ -161,7 +161,7 @@ const colores = ["#f472b6", "#4cc9f0", "#a78bfa"];
 const lluvia = $("lluvia");
 const cantidad = window.innerWidth < 600 ? 8 : 16;
 const azar = (a, b) => a + Math.random() * (b - a);
-
+ 
 for (let i = 0; i < cantidad; i++) {
   const f = document.createElement("span");
   f.textContent = formulas[Math.floor(Math.random() * formulas.length)];
@@ -173,11 +173,11 @@ for (let i = 0; i < cantidad; i++) {
   f.style.setProperty("--giro", azar(-12, 12) + "deg");
   lluvia.appendChild(f);
 }
-
+ 
 document.title = modulo.titulo;
 $("titulo-modulo").textContent = modulo.titulo;
 $("intro-modulo").textContent = modulo.descripcion;
-
+ 
 // Construir la lista de subtemas
 $("lista").innerHTML = modulo.subtemas.map((s, i) => `
   <li>
@@ -186,14 +186,14 @@ $("lista").innerHTML = modulo.subtemas.map((s, i) => `
       <span class="nombre">${s.titulo}</span>
     </a>
   </li>`).join("");
-
+ 
 // ---- FÓRMULAS BONITAS (MathML) ----
 // Escribe la fórmula como texto normal y usa dos atajos:
 //   {arriba}/{abajo}   -> fracción con raya        {n!}/{(n−r)!}
 //   P[n,r]             -> letra con subíndices     P[n,r] se ve como ₙPᵣ (también V[n,r], C[n,r])
 // Todo lo demás se escribe tal cual: "n! = n × (n−1)!"
 const escMate = (t) => t.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
-
+ 
 function cierreLlave(s, i) {          // posición de la llave que cierra la de s[i]
   let d = 0;
   for (let j = i; j < s.length; j++) {
@@ -202,7 +202,7 @@ function cierreLlave(s, i) {          // posición de la llave que cierra la de 
   }
   return -1;
 }
-
+ 
 function filaMate(s) {
   const t = [];                       // [tipo, MathML]: o = operador, s = espacio, otro = resto
   let i = 0, m;
@@ -237,19 +237,19 @@ function filaMate(s) {
     return a && b && a[0] !== "o" && b[0] !== "o" ? '<mspace width="0.4em"/>' : "";
   }).join("");
 }
-
+ 
 function mate(src) {
   if (/</.test(src)) return src;      // si escribiste HTML a mano, se respeta
   return `<math display="block">${filaMate(src)}</math>`;
 }
-
+ 
 // ---- REPASO: generadores de ejercicios (cada uno crea números nuevos al azar) ----
 const rnd = (a, b) => a + Math.floor(Math.random() * (b - a + 1));
 const pick = (arr) => arr[Math.floor(Math.random() * arr.length)];
 const fac = (n) => (n <= 1 ? 1 : n * fac(n - 1));
 const fmt = (n) => n.toLocaleString("en-US");
 const prod = (n, r) => { let p = 1; for (let i = 0; i < r; i++) p *= n - i; return p; };
-
+ 
 // Casos para clasificar (se usan en los temas 1.1 y 1.5)
 const ORDEN = [
   [(n) => `Se eligen presidente y secretario entre ${n} estudiantes.`, "si", "Los cargos son diferentes, así que cambiar el orden cambia el resultado."],
@@ -278,17 +278,44 @@ const CLASIFICAR = [
   [(n, k) => `Se eligen ${k} estudiantes de ${n} para el equipo QA (misma función).`, "combinacion", "No hay cargos diferentes; el orden no importa."],
 ];
 const PALABRAS = ["LUNA", "CASA", "PAPA", "SALA", "ALMA", "MAMA", "ANA", "BANANA", "LLAMA", "RADAR", "MESA", "TATA"];
-
+ 
+const barajar = (arr) => [...arr].sort(() => Math.random() - 0.5);
+const ELEGIR_Y = [   // [qué se elige, mínimo, máximo de opciones]
+  ["un rol", 3, 8], ["un tipo de acceso", 2, 5], ["una región del servidor", 2, 4],
+  ["un lenguaje de programación", 3, 6], ["un editor de código", 2, 5], ["un tema de interfaz", 2, 4],
+];
+const ELEGIR_O = [   // [inicio de la frase, [opciones posibles], aclaración]
+  ["Para ir al colegio se puede usar", [["bicicleta", 1, 4], ["bus", 2, 5], ["carro", 1, 5], ["moto", 1, 3], ["caminar por rutas distintas", 1, 3]], "Se usa solo uno de esos medios."],
+  ["Para reportar un error se puede usar", [["correo", 1, 3], ["chat", 1, 3], ["formulario web", 1, 4], ["llamada", 1, 2]], "Se usa solo una de esas vías."],
+];
+const MIXTOS = [
+  (p, a, b) => `Un usuario elige un rol (${p} opciones) y después entra por la web (${a} formas) o por la app móvil (${b} formas).`,
+  (p, a, b) => `Un pedido se arma eligiendo un tamaño (${p} opciones) y un sabor, que puede ser clásico (${a} opciones) o especial (${b} opciones).`,
+  (p, a, b) => `Para entrar a un curso se elige un horario (${p} opciones) y un salón: del edificio A (${a} salones) o del edificio B (${b} salones).`,
+];
+ 
+const OBJETOS = ["carros de colores distintos", "libros diferentes", "archivos distintos", "camisetas de colores distintos", "tarjetas con códigos diferentes"];
+const PAL_REP = ["PAPA", "SALA", "ALMA", "MAMA", "BANANA", "LLAMA", "RADAR"];
+const TIPOS = [      // [texto(n, palabra, a), tipo, explicación]
+  [(n) => `${n} personas hacen una fila para entrar a un concierto.`, "lineal", "Se ordenan en fila: hay un primer y un último lugar."],
+  [(n) => `${n} libros se ordenan en un estante.`, "lineal", "Se ordenan en línea, con principio y final."],
+  [(n) => `${n} tareas se ordenan en una cola de ejecución.`, "lineal", "Es una secuencia con principio y final."],
+  [(n) => `${n} personas se sientan alrededor de una mesa redonda.`, "circular", "Están en círculo: no hay un primer lugar fijo."],
+  [(n) => `${n} llaves se cuelgan en un llavero redondo.`, "circular", "Están en un ciclo: girar todas no crea una forma nueva."],
+  [(n) => `${n} invitados cenan en una mesa circular.`, "circular", "Están en círculo, sin posición inicial."],
+  [(n, w) => `Se ordenan las letras de la palabra ${w}.`, "repetidos", "Hay letras iguales, así que se divide entre el factorial de cada repetición."],
+  [(n, w, a) => `Se ordenan ${n} fichas: ${a} rojas iguales y ${n - a} azules iguales.`, "repetidos", "Hay elementos iguales, así que se divide entre el factorial de cada grupo."],
+];
 const GEN = [
   // 1.1 Combinatoria: orden y repetición
   [
     () => { const n = rnd(10, 40), k = rnd(2, 4), [t, r, e] = pick(ORDEN), txt = t(n, k);
-      return { enunciado: `¿Importa el orden? Responde sí o no.<br><em>${txt}</em>`, respuesta: r, ph: "sí o no", sol: [e, `Respuesta: ${r === "si" ? "sí" : "no"}.`], firma: txt }; },
+      return { enunciado: `¿Importa el orden? Responde sí o no.<br>${txt}`, respuesta: r, ph: "sí o no", sol: [e, `Respuesta: ${r === "si" ? "sí" : "no"}.`], firma: txt }; },
     () => { const n = rnd(5, 9), [t, r, e] = pick(REPETICION), txt = t(n);
-      return { enunciado: `¿Se puede repetir? Responde sí o no.<br><em>${txt}</em>`, respuesta: r, ph: "sí o no", sol: [e, `Respuesta: ${r === "si" ? "sí" : "no"}.`], firma: txt }; },
-    () => { const N = rnd(10, 40), k = rnd(2, 5), pide = pick(["población", "muestra"]);
-      return { enunciado: `En un grupo de ${N} estudiantes se selecciona un comité de ${k}. ¿Cuál es la ${pide}? (escribe el número)`, respuesta: String(pide === "población" ? N : k), ph: "número",
-        sol: ["La población es el total de elementos disponibles: " + N + ".", "La muestra son los elementos que se seleccionan: " + k + ".", `Respuesta: ${pide === "población" ? N : k}.`], firma: `pob-${N}-${k}-${pide}` }; },
+      return { enunciado: `¿Se puede repetir? Responde sí o no.<br>${txt}`, respuesta: r, ph: "sí o no", sol: [e, `Respuesta: ${r === "si" ? "sí" : "no"}.`], firma: txt }; },
+    () => { const n = rnd(3, 6), x = pick(OBJETOS);
+      return { enunciado: `Tienes ${n} ${x} y quieres ordenarlos todos en una fila. ¿De cuántas formas puedes hacerlo?`, respuesta: String(fac(n)), ph: "resultado",
+        sol: [`Población: ${n} elementos. Muestra: los mismos ${n}, porque se ordenan todos.`, "¿Importa el orden? Sí: cambiar la posición da otra fila.", "¿Se puede repetir? No: cada elemento es distinto y existe una sola vez.", `Con orden y sin repetición se usa n!: ${n}! = ${fmt(fac(n))}.`], firma: `ia-${n}-${x}` }; },
   ],
   // 1.2 Factorial
   [
@@ -304,56 +331,91 @@ const GEN = [
     () => { const a = rnd(6, 15), k = rnd(1, 2), r = k === 1 ? a : a * (a - 1);
       return { enunciado: `Simplifica:${mate(`{${a}!}/{${a - k}!}`)}`, respuesta: String(r), ph: "resultado",
         sol: [k === 1 ? `${a}! = ${a} × ${a - 1}!` : `${a}! = ${a} × ${a - 1} × ${a - 2}!`, `Se cancela ${a - k}! arriba y abajo.`, `Queda ${k === 1 ? a : a + " × " + (a - 1)} = ${r}.`], firma: `oa-${a}-${k}` }; },
-    () => { const p = rnd(2, 3), q = rnd(5, 9), r = fac(p) * q;
-      return { enunciado: `Simplifica:${mate(`{${p}! × ${q}!}/{${q - 1}!}`)}`, respuesta: String(r), ph: "resultado",
-        sol: [`${q}! = ${q} × ${q - 1}!`, `Se cancela ${q - 1}! arriba y abajo.`, `Queda ${p}! × ${q} = ${fac(p)} × ${q} = ${r}.`], firma: `ob-${p}-${q}` }; },
+    () => {   // problema conceptual con texto: hay que analizar, no solo calcular
+      const tipo = rnd(1, 4), seq = (hasta, desde) => Array.from({ length: hasta - desde + 1 }, (_, i) => hasta - i);
+      if (tipo === 1) { const a = rnd(5, 10), d = rnd(2, 3), b = a - d, f = seq(a, b + 1), r = f.reduce((x, y) => x * y, 1);
+        return { enunciado: `Un estudiante dice que ${a}! / ${b}! se simplifica dividiendo ${a} ÷ ${b}. Analiza su razonamiento: ¿cuál es el resultado correcto de ${a}! / ${b}!?`, respuesta: String(r), ph: "resultado",
+          sol: ["Un factorial no se simplifica dividiendo los números: n! es una multiplicación de varios factores.", `${a}! = ${f.join(" × ")} × ${b}!, y se cancela ${b}! arriba y abajo.`, `Queda ${f.join(" × ")} = ${r}.`], firma: `k1-${a}-${d}` }; }
+      if (tipo === 2) { const a = rnd(8, 15), d = rnd(3, 6), b = a - d;
+        return { enunciado: `Un programa debe calcular ${a}! / ${b}!. Si simplifica antes de multiplicar, ¿cuántos números multiplica realmente?`, respuesta: String(d), ph: "cantidad de números",
+          sol: [`${a}! = ${a} × ${a - 1} × … × ${b + 1} × ${b}!`, `Se cancela ${b}!, y quedan los números desde ${b + 1} hasta ${a}.`, `${a} − ${b} = ${d} números.`], firma: `k2-${a}-${d}` }; }
+      if (tipo === 3) { const k = rnd(2, 3), n = k === 2 ? rnd(4, 12) : rnd(5, 9), v = prod(n, k);
+        return { enunciado: `Se sabe que n! / (n−${k})! = ${v}. Analiza la expresión y encuentra el valor de n.`, respuesta: String(n), ph: "valor de n",
+          sol: [`Se escribe n! = ${k === 2 ? "n × (n−1)" : "n × (n−1) × (n−2)"} × (n−${k})! y se cancela (n−${k})!.`, `Queda ${k === 2 ? "n × (n−1)" : "n × (n−1) × (n−2)"} = ${v}.`, `Son ${k === 2 ? "dos" : "tres"} números consecutivos que multiplicados dan ${v}: ${seq(n, n - k + 1).join(" × ")}.`, `Entonces n = ${n}.`], firma: `k3-${n}-${k}` }; }
+      const a = rnd(7, 12), b = a - 3;
+      return { enunciado: `Para simplificar ${a}! / ${b}! se escribe ${a}! = ${a} × ${a - 1} × ___ × ${b}!. ¿Qué número va en el espacio?`, respuesta: String(a - 2), ph: "número",
+        sol: [`Un factorial se expande bajando de uno en uno hasta llegar al factorial que se quiere cancelar.`, `Después de ${a} × ${a - 1} sigue ${a - 2}, que es el último número antes de llegar a ${b}!.`, `Respuesta: ${a - 2}.`], firma: `k4-${a}` }; },
     () => { const c = rnd(4, 8), d = rnd(3, 6), a = c + 2, b = d + 1, r = a * (a - 1) * b;
       return { enunciado: `Simplifica:${mate(`{${a}! × ${b}!}/{${c}! × ${d}!}`)}`, respuesta: String(r), ph: "resultado",
         sol: [`${a}! = ${a} × ${a - 1} × ${c}!  y  ${b}! = ${b} × ${d}!`, `Se cancelan ${c}! y ${d}!.`, `Queda ${a} × ${a - 1} × ${b} = ${r}.`], firma: `oc-${c}-${d}` }; },
   ],
-  // 1.4 Principio fundamental del conteo
+  // 1.4 Principio fundamental del conteo: practica «y» = multiplicar y «o» = sumar
   [
-    () => { const r = rnd(3, 8), s = rnd(2, 5);
-      return { enunciado: `Un sistema tiene ${r} roles y ${s} tipos de acceso. Para crear una cuenta se elige un rol y un acceso. ¿Cuántas configuraciones hay?`, respuesta: String(r * s), ph: "resultado",
-        sol: ["Rol Y acceso: los eventos ocurren juntos, se multiplica.", `${r} × ${s} = ${r * s}.`], firma: `ca-${r}-${s}` }; },
-    () => { const k = rnd(3, 4), d = pick([2, 3, 4, 5, 6, 10]);
-      return { enunciado: `Un código tiene ${k} posiciones y en cada una se elige entre ${d} símbolos distintos (se pueden repetir). ¿Cuántos códigos hay?`, respuesta: String(d ** k), ph: "resultado",
-        sol: [`Cada posición tiene ${d} opciones y todas ocurren juntas.`, `${Array(k).fill(d).join(" × ")} = ${fmt(d ** k)}.`], firma: `cb-${k}-${d}` }; },
-    () => { const b = rnd(1, 4), s = rnd(2, 5), c = rnd(1, 5);
-      return { enunciado: `Para ir al colegio hay ${b} bicicleta(s), ${s} rutas de bus y ${c} carro(s). Se usa solo uno de esos medios. ¿Cuántas opciones hay?`, respuesta: String(b + s + c), ph: "resultado",
-        sol: ["Se va en bicicleta O bus O carro: son opciones excluyentes, se suma.", `${b} + ${s} + ${c} = ${b + s + c}.`], firma: `cc-${b}-${s}-${c}` }; },
+    () => {   // «y»: los eventos ocurren juntos -> se multiplica
+      const ev = barajar(ELEGIR_Y).slice(0, rnd(2, 3)).map(([t, mn, mx]) => [t, rnd(mn, mx)]);
+      const ns = ev.map(([, n]) => n), total = ns.reduce((x, y) => x * y, 1);
+      return { enunciado: `Para configurar una cuenta hay que elegir ${ev.map(([t, n]) => `${t} (${n} opciones)`).join(" y ")}. ¿Cuántas configuraciones distintas hay?`,
+        respuesta: String(total), ph: "resultado",
+        sol: ["Aparece «y»: los eventos ocurren juntos, así que se multiplica.", `${ns.join(" × ")} = ${total}.`], firma: "y-" + ev.map(([t, n]) => t + n).join("-") }; },
+    () => {   // «o»: solo se elige una opción -> se suma
+      const [intro, items, nota] = pick(ELEGIR_O);
+      const ev = barajar(items).slice(0, rnd(3, items.length)).map(([t, mn, mx]) => [t, rnd(mn, mx)]);
+      const ns = ev.map(([, n]) => n), total = ns.reduce((x, y) => x + y, 0);
+      return { enunciado: `${intro}: ${ev.map(([t, n]) => `${t} (${n} ${n === 1 ? "opción" : "opciones"})`).join(" o ")}. ${nota} ¿Cuántas opciones hay en total?`,
+        respuesta: String(total), ph: "resultado",
+        sol: ["Aparece «o»: solo se elige una opción, así que se suma.", `${ns.join(" + ")} = ${total}.`], firma: "o-" + intro + ev.map(([t, n]) => t + n).join("-") }; },
+    () => {   // «y» y «o» juntas
+      const p = rnd(2, 8), a = rnd(2, 5), b = rnd(2, 5), plantilla = pick(MIXTOS);
+      return { enunciado: plantilla(p, a, b) + " ¿Cuántas formas distintas hay?", respuesta: String(p * (a + b)), ph: "resultado",
+        sol: [`La parte con «o» se suma, porque solo se elige una de las dos: ${a} + ${b} = ${a + b}.`, `Luego «y» une los dos eventos y se multiplica: ${p} × ${a + b} = ${p * (a + b)}.`], firma: `m-${p}-${a}-${b}-${plantilla(0, 0, 0).length}` }; },
   ],
-  // 1.5 Condición: permutación o variación
+  // 1.5 Condición: permutación o variación (¿importa el orden? ¿todos o algunos?)
   [
     () => { const n = rnd(6, 12), k = rnd(2, 4), [t, r, e] = pick(CLASIFICAR), txt = t(n, k);
-      return { enunciado: `Clasifica el caso: ¿permutación, variación o combinación?<br><em>${txt}</em>`, respuesta: r, ph: "permutación, variación o combinación", sol: [e, `Respuesta: ${r === "permutacion" ? "permutación" : r === "variacion" ? "variación" : "combinación"}.`], firma: txt }; },
-    () => { const n = rnd(4, 7), x = pick(["equipos", "corredores", "módulos"]);
+      return { enunciado: `Clasifica el caso: ¿permutación, variación o combinación?<br>${txt}`, respuesta: r, ph: "permutación, variación o combinación", contiene: true, sol: [e, `Respuesta: ${r === "permutacion" ? "permutación" : r === "variacion" ? "variación" : "combinación"}.`], firma: txt }; },
+    () => {   // decide según el orden: variación (orden sí) o combinación (orden no)
+      const comb = Math.random() < 0.5, n = rnd(5, 9), r = rnd(2, 3), v = prod(n, r), c = v / fac(r);
+      const cargos = r === 2 ? "presidente y secretario" : "presidente, secretario y tesorero";
+      return comb
+        ? { enunciado: `De ${n} estudiantes se elige un comité de ${r} personas (todas con la misma función). ¿De cuántas formas se puede elegir?`, respuesta: String(c), ph: "resultado",
+            sol: ["¿Importa el orden? No: todos tienen la misma función. Es combinación.", `C(n,r) = n! / ((n−r)! · r!) = ${n}! / (${n - r}! · ${r}!)`, `${v} / ${fac(r)} = ${c}.`], firma: `dc-${n}-${r}` }
+        : { enunciado: `De ${n} estudiantes se eligen ${r} para ocupar estos cargos: ${cargos}. ¿De cuántas formas se pueden asignar?`, respuesta: String(v), ph: "resultado",
+            sol: ["¿Importa el orden? Sí: los cargos son diferentes.", `¿Se ordenan todos? No, solo ${r} de ${n}: es variación.`, `V(n,r) = n! / (n−r)! = ${n}! / ${n - r}! = ${Array.from({ length: r }, (_, i) => n - i).join(" × ")} = ${v}.`], firma: `dv-${n}-${r}` }; },
+    () => {   // todos los elementos: permutación, o variación con r = n
+      const n = rnd(4, 7), vnn = Math.random() < 0.5;
+      if (vnn) { const [x, y] = pick([["estudiantes", "cargos diferentes"], ["servidores", "tareas diferentes"], ["equipos", "puestos diferentes"]]);
+        return { enunciado: `De ${n} ${x} se asignan ${n} ${y}, uno para cada uno. ¿De cuántas formas? (escríbelo como V(${n},${n}))`, respuesta: String(fac(n)), ph: "resultado",
+          sol: ["El orden importa y se usan todos: r = n.", `V(n,n) = n! / (n−n)! = ${n}! / 0! = ${n}! / 1`, `Por eso V(n,n) = P(n) = ${n}! = ${fmt(fac(n))}.`], firma: `evn-${n}-${x}` }; }
+      const x = pick(["equipos", "corredores", "módulos"]);
       return { enunciado: `${n} ${x} quedan ordenados del 1.º al ${n}.º lugar. ¿De cuántas formas puede quedar el orden?`, respuesta: String(fac(n)), ph: "resultado",
-        sol: ["Importa el orden y se ordenan todos: permutación P(n) = n!.", `${n}! = ${fmt(fac(n))}.`], firma: `pb-${n}-${x}` }; },
-    () => { const n = rnd(6, 12), r = rnd(2, 3), v = prod(n, r);
-      return { enunciado: `De ${n} usuarios se asignan ${r} roles diferentes. ¿De cuántas formas? V(${n},${r})`, respuesta: String(v), ph: "resultado",
-        sol: [`V(n,r) = n! / (n−r)! = ${n}! / ${n - r}!`, `Queda ${Array.from({ length: r }, (_, i) => n - i).join(" × ")} = ${v}.`], firma: `pc-${n}-${r}` }; },
+        sol: ["¿Importa el orden? Sí. ¿Se ordenan todos? Sí: es permutación, P(n) = n!.", `${n}! = ${fmt(fac(n))}.`], firma: `ep-${n}-${x}` }; },
   ],
-  // 1.6 Permutación y variación
+  // 1.6 Permutación y variación: lineal, circular y con repetidos
   [
-    () => { const p = rnd(4, 10), lugar = pick(["una mesa redonda", "una mesa circular de reuniones", "una mesa de cartas redonda"]);
-      return { enunciado: `${p} personas se sientan alrededor de ${lugar}. ¿De cuántas formas pueden hacerlo?`, respuesta: String(fac(p - 1)), ph: "resultado",
-        sol: ["Permutación circular: Pc(n) = (n−1)!, porque girar a todos no crea una forma nueva.", `(${p}−1)! = ${p - 1}! = ${fmt(fac(p - 1))}.`], firma: `qa-${p}-${lugar}` }; },
+    () => {   // reconocer el tipo de permutación
+      const n = rnd(5, 9), w = pick(PAL_REP), a = rnd(2, 3), [t, r, e] = pick(TIPOS), txt = t(n, w, a);
+      return { enunciado: `¿Qué tipo de permutación es: lineal, circular o con repetidos?<br>${txt}`, respuesta: r, ph: "lineal, circular o repetidos", contiene: true,
+        sol: [e, `Respuesta: ${r === "repetidos" ? "con elementos repetidos" : r}.`], firma: txt }; },
     () => { const w = pick(PALABRAS), cuenta = {}; for (const c of w) cuenta[c] = (cuenta[c] || 0) + 1;
       const rep = Object.entries(cuenta).filter(([, m]) => m > 1), den = rep.reduce((a, [, m]) => a * fac(m), 1), r = fac(w.length) / den;
       return { enunciado: `¿Cuántas formas hay de ordenar las letras de la palabra ${w}?`, respuesta: String(r), ph: "resultado",
         sol: [`Tiene ${w.length} letras` + (rep.length ? `, con repetidas: ${rep.map(([c, m]) => c + " = " + m).join(", ")}.` : " y todas son distintas."),
           rep.length ? `${w.length}! / (${rep.map(([, m]) => m + "!").join(" · ")}) = ${fmt(fac(w.length))} / ${den}` : `${w.length}! = ${fmt(r)}`, `Respuesta: ${fmt(r)}.`], firma: `qb-${w}` }; },
-    () => { const a = rnd(2, 5), b = rnd(2, 5), n = a + b, r = fac(n) / (fac(a) * fac(b));
-      return { enunciado: `Una fila tiene ${n} fichas: ${a} rojas iguales y ${b} azules iguales. ¿De cuántas formas se pueden ordenar?`, respuesta: String(r), ph: "resultado",
-        sol: [`Con repetidos: n! / (a! · b!) = ${n}! / (${a}! · ${b}!)`, `${fmt(fac(n))} / (${fac(a)} × ${fac(b)}) = ${r}.`], firma: `qc-${a}-${b}` }; },
+    () => {   // calcular según sea lineal o circular
+      const n = rnd(4, 9), circ = Math.random() < 0.5,
+        ctx = pick(circ ? ["se sientan alrededor de una mesa redonda", "se sientan alrededor de una fogata", "se suben a un carrusel redondo"]
+                        : ["se colocan en una fila para una foto", "hacen una fila para entrar a un concierto", "se forman en una cola del banco"]),
+        r = circ ? fac(n - 1) : fac(n);
+      return { enunciado: `${n} personas ${ctx}. ¿De cuántas formas pueden ordenarse?`, respuesta: String(r), ph: "resultado",
+        sol: circ ? ["Están en círculo: permutación circular, Pc(n) = (n−1)!, porque girar a todos no crea una forma nueva.", `(${n}−1)! = ${n - 1}! = ${fmt(r)}.`]
+                  : ["Están en fila: permutación lineal, P(n) = n!.", `${n}! = ${fmt(r)}.`], firma: `qc-${n}-${ctx}` }; },
   ],
 ];
-
+ 
 // ---- REPASO: pantalla, ejercicios sin repetir y borrado al salir ----
 $("lista").insertAdjacentHTML("beforeend",
   '<li class="repaso"><a href="#/repaso"><span class="num">R</span><span class="nombre">Repaso: ejercicios nuevos</span></a></li>');
-
+ 
 const vistaRepaso = document.createElement("section");
 vistaRepaso.id = "vista-repaso";
 vistaRepaso.className = "detalle";
@@ -365,7 +427,7 @@ vistaRepaso.innerHTML = `
   <div class="repaso-acciones"><button type="button" class="btn-nuevos" id="btn-nuevos">Nuevos ejercicios</button></div>
   <div id="repaso-contenido"></div>`;
 document.querySelector("main").appendChild(vistaRepaso);
-
+ 
 // Memoria de ejercicios ya vistos (para que los nuevos sean diferentes)
 const CLAVE_VISTOS = "modulo1_repaso_vistos";
 let vistos = new Set();
@@ -373,7 +435,7 @@ try { vistos = new Set(JSON.parse(localStorage.getItem(CLAVE_VISTOS) || "[]")); 
 function guardarVistos() {
   try { localStorage.setItem(CLAVE_VISTOS, JSON.stringify([...vistos].slice(-600))); } catch (e) {}
 }
-
+ 
 // Crea un ejercicio que no haya salido antes (si ya salieron todos los posibles, puede repetirse)
 function ejercicioNuevo(tema, n) {
   let ej, clave;
@@ -385,12 +447,12 @@ function ejercicioNuevo(tema, n) {
   vistos.add(clave);
   return ej;
 }
-
+ 
 const normaliza = (t) => String(t).trim().toLowerCase().normalize("NFD")
   .replace(/[\u0300-\u036f]/g, "").replace(/[\s,.]/g, "");
 let ejerciciosActivos = {};   // se vacía al salir del repaso
 let repasoActivo = false;
-
+ 
 function dibujarRepaso() {
   ejerciciosActivos = {};
   let html = "";
@@ -418,25 +480,26 @@ function dibujarRepaso() {
   guardarVistos();
   repasoActivo = true;
 }
-
+ 
 function limpiarRepaso() {            // al salir, los ejercicios se borran
   if (!repasoActivo) return;
   $("repaso-contenido").innerHTML = "";
   ejerciciosActivos = {};
   repasoActivo = false;
 }
-
+ 
 function comprobarEjercicio(art) {
   const ej = ejerciciosActivos[art.dataset.id];
   if (!ej) return;
   const valor = normaliza(art.querySelector("input").value);
   const msg = art.querySelector(".ej-msg");
   if (!valor) { msg.textContent = "Escribe tu respuesta primero."; msg.className = "ej-msg mal"; return; }
-  const ok = valor === normaliza(ej.respuesta);
+  const resp = normaliza(ej.respuesta);
+  const ok = valor === resp || (ej.contiene && valor.includes(resp));
   msg.textContent = ok ? "¡Correcto!" : "Todavía no. Revisa la solución e inténtalo otra vez.";
   msg.className = "ej-msg " + (ok ? "ok" : "mal");
 }
-
+ 
 $("repaso-contenido").addEventListener("click", (e) => {
   const b = e.target.closest(".ej-comprobar");
   if (b) comprobarEjercicio(b.closest(".ejercicio"));
@@ -445,7 +508,7 @@ $("repaso-contenido").addEventListener("keydown", (e) => {
   if (e.key === "Enter" && e.target.matches(".ej-resp input")) comprobarEjercicio(e.target.closest(".ejercicio"));
 });
 $("btn-nuevos").addEventListener("click", () => { dibujarRepaso(); window.scrollTo(0, 0); });
-
+ 
 // Dibuja los 3 recuadros del subtema (o el bloque libre "contenido")
 function renderDetalle(sub) {
   const cont = $("detalle-contenido");
@@ -475,7 +538,7 @@ function renderDetalle(sub) {
     </section>`;
   iniciarSlider(cont);
 }
-
+ 
 // Deslizador de fórmulas: flechas, contador y deslizar con el dedo o la rueda
 function iniciarSlider(raiz) {
   const pista = raiz.querySelector(".pista");
@@ -497,7 +560,7 @@ function iniciarSlider(raiz) {
   pista.addEventListener("scroll", actualizar, { passive: true });
   actualizar();
 }
-
+ 
 // Mostrar la vista según la dirección (#/ o #/3)
 function mostrar() {
   if (location.hash === "#/repaso") {
@@ -511,35 +574,35 @@ function mostrar() {
   }
   vistaRepaso.hidden = true;
   limpiarRepaso();
-
+ 
   const m = location.hash.match(/^#\/(\d+)$/);
   const i = m ? parseInt(m[1], 10) - 1 : -1;
   const sub = modulo.subtemas[i];
-
+ 
   if (!sub) {
     vistaDetalle.hidden = true;
     vistaIndice.hidden = false;
     document.title = modulo.titulo;
     return;
   }
-
+ 
   vistaIndice.hidden = true;
   vistaDetalle.hidden = false;
   document.title = `${sub.titulo} · ${modulo.titulo}`;
   $("detalle-titulo").textContent = sub.titulo;
   $("detalle-modulo").textContent = modulo.titulo;
   renderDetalle(sub);
-
+ 
   const anterior = modulo.subtemas[i - 1];
   const siguiente = modulo.subtemas[i + 1];
   $("nav").innerHTML =
     (anterior ? `<a href="#/${i}">← ${anterior.titulo}</a>` : "<span></span>") +
     (siguiente ? `<a href="#/${i + 2}">${siguiente.titulo} →</a>` : "<span></span>");
-
+ 
   window.scrollTo(0, 0);
 }
-
-
+ 
+ 
 // ---- Luz que recorre el botón ----
 // Al pasar el cursor (o enfocar con el teclado), una luz nace donde entró
 // el cursor y da vueltas por todo el borde del botón hasta que sales.
@@ -548,7 +611,7 @@ const VELOCIDAD = 260;            // grados por segundo (súbelo para que gire m
 const activos = new Map();        // botón -> { ang, saliendo }
 const sinMovimiento = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 let anterior = 0;
-
+ 
 function bucle(t) {
   const dt = (t - anterior) / 1000;
   anterior = t;
@@ -559,7 +622,7 @@ function bucle(t) {
   });
   if (activos.size) requestAnimationFrame(bucle);
 }
-
+ 
 function encender(el, evento) {
   if (sinMovimiento) return;
   let ang = 0;
@@ -574,14 +637,14 @@ function encender(el, evento) {
   el.classList.add("luz-on");
   if (arrancar) { anterior = performance.now(); requestAnimationFrame(bucle); }
 }
-
+ 
 function apagar(el) {
   el.classList.remove("luz-on");
   setTimeout(() => {                       // deja que se desvanezca y luego deja de animar
     if (!el.classList.contains("luz-on")) activos.delete(el);
   }, 350);
 }
-
+ 
 document.addEventListener("pointerover", (e) => {
   const el = e.target.closest(SELECTOR_LUZ);
   if (el && !el.contains(e.relatedTarget)) encender(el, e);
@@ -598,6 +661,7 @@ document.addEventListener("focusout", (e) => {
   const el = e.target.closest(SELECTOR_LUZ);
   if (el) apagar(el);
 });
-
+ 
 window.addEventListener("hashchange", mostrar);
 mostrar();
+ 
