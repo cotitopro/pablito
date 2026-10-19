@@ -1,4 +1,4 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="es">
 <head>
   <meta charset="UTF-8">
@@ -13,6 +13,20 @@
     <section id="vista-indice">
       <h1 id="titulo-modulo">Módulo 1</h1>
       <p class="intro" id="intro-modulo">Elige un subtema para ver su contenido.</p>
+      <aside class="mascota" id="mascota" aria-label="Tu mascota de progreso">
+        <button class="mascota-avatar" id="mascota-avatar" type="button" aria-label="Saluda a tu mascota" title="Tócame para saludar">
+          <img class="mascota-pollito" id="mascota-pollito" src="pollito.gif" alt="" hidden>
+          <span id="mascota-emoji" aria-hidden="true">🥚</span>
+        </button>
+        <div class="mascota-info">
+          <strong id="mascota-nombre">Tu mascota · Huevo</strong>
+          <output id="mascota-mensaje" aria-live="polite">¡Hola! Me alegra verte. Vamos a crecer juntos. 💜</output>
+          <progress class="mascota-barra" id="mascota-barra" aria-label="Crecimiento del huevo" max="100" value="0">
+            <span id="mascota-relleno"></span>
+          </progress>
+        </div>
+        <span class="mascota-progreso" id="mascota-progreso">0%</span>
+      </aside>
       <ul class="lista" id="lista"></ul>
     </section>
 
@@ -24,6 +38,12 @@
       <div class="nav" id="nav"></div>
     </section>
   </main>
+
+  <aside class="pollito-companero" id="pollito-companero" aria-label="Tu pollito te acompaña" hidden>
+    <span class="pollito-companero-huevo" id="pollito-companero-huevo" aria-hidden="true">🥚</span>
+    <img src="pollito.gif" alt="" class="pollito-companero-img" id="pollito-companero-img" hidden>
+    <output id="pollito-companero-mensaje" aria-live="polite"></output>
+  </aside>
 
   <script src="./animacion.js"></script>
 </body>
