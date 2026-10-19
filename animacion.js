@@ -149,22 +149,34 @@ const vistaDetalle = $("vista-detalle");
 
 // Lluvia de fórmulas matemáticas (puedes agregar o quitar fórmulas de esta lista)
 const formulas = [
+  // Clásicas
   "E = mc²", "a² + b² = c²", "∫ x² dx = x³/3", "e^(iπ) + 1 = 0",
   "∑ 1/n² = π²/6", "x = (−b ± √(b²−4ac)) / 2a", "sin²θ + cos²θ = 1",
   "d/dx sin x = cos x", "lim x→0 sin x / x = 1", "P(x) = aₙxⁿ + … + a₁x + a₀",
   "(a + b)² = a² + 2ab + b²", "n! = n·(n−1)!", "Δ = b² − 4ac",
   "log(ab) = log a + log b", "P(A|B) = P(B|A)·P(A) / P(B)",
   "(x+1)(x−1) = x² − 1", "f′(x) = lim h→0 [f(x+h)−f(x)]/h", "π ≈ 3.14159",
-  "∇·E = ρ/ε₀", "∞", "√2", "∂f/∂x", "x³ + 2x² − 5x + 1"
+  "∇·E = ρ/ε₀", "∞", "√2", "∂f/∂x", "x³ + 2x² − 5x + 1",
+  // Combinatoria (las de este módulo)
+  "0! = 1", "5! = 120", "P(n) = n!", "Pc(n) = (n−1)!", "V(n,r) = n! / (n−r)!",
+  "C(n,r) = n! / (r!(n−r)!)", "C(5,2) = 10", "V(8,3) = 336", "3! = 6",
+  "m × n", "n₁ × n₂ × n₃", "7!/6! = 7", "10!/8! = 90", "n!/(m₁!·m₂!)",
+  "(n+1)! = (n+1)·n!", "C(n,0) = 1", "C(n,1) = n", "C(n,r) = C(n,n−r)",
+  // Más matemáticas curiosas
+  "φ = (1+√5)/2", "e ≈ 2.71828", "1 + 2 + … + n = n(n+1)/2", "(a−b)² = a² − 2ab + b²",
+  "a³ − b³ = (a−b)(a²+ab+b²)", "Fₙ = Fₙ₋₁ + Fₙ₋₂", "cos 2θ = 2cos²θ − 1",
+  "i² = −1", "log₂ 8 = 3", "2ⁿ", "√(a²) = |a|", "y = mx + b", "A = πr²", "V = ⁴⁄₃πr³",
+  "σ² = Σ(x−μ)²/n", "a/b = c/d ⇒ ad = bc", "x⁰ = 1", "∫ 1/x dx = ln|x|"
 ];
 const colores = ["#ff4f8b", "#00a6fb", "#7c4dff", "#ff9f1c", "#00c48c"];
 const lluvia = $("lluvia");
 const cantidad = window.innerWidth < 600 ? 8 : 16;
 const azar = (a, b) => a + Math.random() * (b - a);
 
+const mezcla = [...formulas].sort(() => Math.random() - 0.5);   // así no se repite la misma fórmula en pantalla
 for (let i = 0; i < cantidad; i++) {
   const f = document.createElement("span");
-  f.textContent = formulas[Math.floor(Math.random() * formulas.length)];
+  f.textContent = mezcla[i % mezcla.length];
   f.style.left = azar(0, 92) + "%";
   f.style.color = colores[Math.floor(Math.random() * colores.length)];
   f.style.fontSize = azar(14, 24) + "px";
@@ -524,6 +536,7 @@ function dibujarRepaso() {
   guardarVistos();
   repasoActivo = true;
   repasoCelebrado = false;
+  repasoTerminado = false;
   actualizarMarcador();
 }
 
@@ -554,14 +567,21 @@ function comprobarEjercicio(art) {
       art.classList.add("acierto");
       confeti(art.querySelector(".ej-comprobar"));
       if (art.dataset.fijo) {
+        const tema = Number(art.dataset.fijo.split("_")[0]);
+        const temaYaCompleto = temaCompleto(tema);
         prog.fijos[art.dataset.fijo] = true;
         guardarProg();
         actualizarPractica(art.closest(".caja-practica"));
+        reaccionarMascota(!temaYaCompleto && temaCompleto(tema));
+        if (!temaYaCompleto && repasoDesbloqueado()) iniciarEclosion(art.querySelector(".ej-comprobar"));
       } else {
         prog.correctas++;
         guardarProg();
         actualizarMarcador();
+        reaccionarMascota();
       }
+    } else {
+      reaccionarMascota();
     }
   } else {
     msg.textContent = "¡Casi! Piénsalo con calma e inténtalo otra vez.";
@@ -646,7 +666,17 @@ const CLAVE_PROG = "modulo1_progreso";
 let prog = { vistos: [], correctas: 0, fijos: {}, repasoAvisado: false };
 try { prog = Object.assign(prog, JSON.parse(localStorage.getItem(CLAVE_PROG) || "{}")); } catch (e) {}
 const guardarProg = () => { try { localStorage.setItem(CLAVE_PROG, JSON.stringify(prog)); } catch (e) {} };
+const ultimaVisita = Date.parse(prog.ultimaVisita || "");
+let mascotaAusente = Number.isFinite(ultimaVisita) && Date.now() - ultimaVisita >= 3 * 24 * 60 * 60 * 1000;
+prog.ultimaVisita = new Date().toISOString();
+guardarProg();
 let repasoCelebrado = false;
+let temporizadorMascota;
+let eclosionEnCurso = false;
+let temporizadorEclosion;
+let temporizadorCompanero;
+let indiceFraseCompanero = 0;
+let repasoTerminado = false;
 
 const FRASES = [      // una al azar cada vez que ves el inicio (puedes cambiarlas o agregar más)
   "Cada tema que dominas es un nivel que superas ⭐",
@@ -659,19 +689,172 @@ const FRASES = [      // una al azar cada vez que ves el inicio (puedes cambiarl
 function temaCompleto(t) { return !!GEN[t] && GEN[t].every((_, n) => prog.fijos[`${t}_${n}`]); }
 
 const repasoDesbloqueado = () => modulo.subtemas.every((_, t) => !GEN[t] || temaCompleto(t));
+if (repasoDesbloqueado() && !prog.pollitoNacio) {
+  prog.pollitoNacio = true;
+  guardarProg();
+}
+
+function actualizarMascota(feliz = false) {
+  const total = modulo.subtemas.length;
+  const completados = modulo.subtemas.filter((_, t) => temaCompleto(t)).length;
+  const porcentaje = Math.round(completados / total * 100);
+  const eclosiono = porcentaje === 100;
+  const tarjeta = $("mascota");
+  tarjeta.classList.toggle("triste", !feliz && mascotaAusente);
+  tarjeta.classList.toggle("feliz", feliz);
+  $("mascota-pollito").hidden = !eclosiono || eclosionEnCurso;
+  $("mascota-emoji").hidden = eclosiono && !eclosionEnCurso;
+  $("mascota-avatar").classList.toggle("eclosionado", eclosiono && !eclosionEnCurso);
+  $("mascota-avatar").classList.toggle("eclosionando", eclosionEnCurso);
+  $("mascota-emoji").textContent = "🥚";
+  $("mascota-nombre").textContent = `Tu mascota · ${eclosiono ? "Pollito" : "Huevo"}`;
+  $("mascota-progreso").textContent = `${porcentaje}%`;
+  $("mascota-barra").setAttribute("aria-valuenow", String(porcentaje));
+  $("mascota-barra").setAttribute("aria-valuetext", `${porcentaje}% · ${completados} de ${total} temas completados`);
+  $("mascota-relleno").style.width = `${porcentaje}%`;
+  $("mascota-mensaje").textContent = feliz
+    ? "¡Sí! ¡Sabía que podías! Cada acierto me llena de energía."
+    : mascotaAusente
+      ? "Te extrañé estos días. ¡Qué bueno que volviste!"
+      : eclosiono
+        ? "¡Gracias por ayudarme a nacer! ¡Ahora te acompaño! 🐣"
+        : `Ayúdame a crecer: llevas ${completados} de ${total} temas.`;
+}
+
+function iniciarEclosion(origen) {
+  if (prog.pollitoNacio || !repasoDesbloqueado()) return;
+  prog.pollitoNacio = true;
+  guardarProg();
+  eclosionEnCurso = true;
+  actualizarMascota();
+  $("mascota-avatar").classList.remove("eclosionado", "hablando");
+  $("mascota-avatar").classList.add("eclosionando");
+  $("mascota-mensaje").textContent = "¡El huevo se está rompiendo! Gracias por ayudarme a nacer. 💛";
+  confeti(origen, 70);
+  acompanarEstudio("¡El huevo se está rompiendo! Gracias por ayudarme a nacer. 💛");
+  $("pollito-companero").classList.add("eclosionando");
+  clearTimeout(temporizadorEclosion);
+  temporizadorEclosion = setTimeout(() => {
+    eclosionEnCurso = false;
+    $("mascota-avatar").classList.remove("eclosionando");
+    $("pollito-companero").classList.remove("eclosionando");
+    actualizarMascota(true);
+    $("mascota-mensaje").textContent = "¡Gracias por ayudarme a nacer! ¡Ahora te acompaño! 🐣";
+    acompanarEstudio("¡Gracias por ayudarme a nacer! ¡Ahora te acompaño! 🐣");
+  }, 1500);
+}
+
+function reaccionarMascota(temaTerminado = false) {
+  mascotaAusente = false;
+  prog.ultimaVisita = new Date().toISOString();
+  guardarProg();
+  actualizarMascota(true);
+  const terminados = modulo.subtemas.filter((_, t) => temaCompleto(t)).length;
+  $("mascota-mensaje").textContent = temaTerminado
+    ? terminados === modulo.subtemas.length
+      ? "¡Bienvenido a tu nueva etapa! ¡Completaste todos los temas! Estoy muy orgullosa de ti. 🎉"
+      : `¡Felicidades, terminaste otro tema! Ya llevas ${terminados} de ${modulo.subtemas.length}. ¡Cada paso cuenta!`
+    : "¡Sí! ¡Sabía que podías! Cada acierto me llena de energía.";
+  clearTimeout(temporizadorMascota);
+  temporizadorMascota = setTimeout(() => actualizarMascota(), 2200);
+}
+
+const SALUDOS_MASCOTA = [
+  "¡Hola! Me alegra mucho que estés aquí. 💜",
+  "Me encanta acompañarte mientras aprendes. ✨",
+  "¡Qué bonito es crecer y descubrir cosas nuevas contigo!",
+  "Cada intento te hace más fuerte. ¡Creo mucho en ti! ⭐",
+];
+
+$("mascota-avatar").addEventListener("click", () => {
+  reaccionarMascota();
+  $("mascota-mensaje").textContent = pick(SALUDOS_MASCOTA);
+  const avatar = $("mascota-avatar");
+  avatar.classList.remove("hablando");
+  void avatar.offsetWidth;
+  avatar.classList.add("hablando");
+});
+
+const FRASES_INACTIVIDAD = [
+  (hechos, total) => hechos === total
+    ? "¡Sigo celebrando todo lo que aprendiste! Estoy muy orgullosa de ti. 🎉"
+    : "Aquí estoy, acompañándote con mucho cariño en cada paso. 💜",
+  (hechos, total) => hechos
+    ? `¡Ya llevas ${hechos} de ${total} temas! Vas genial, sigue a tu ritmo. ⭐`
+    : "Tómate tu tiempo. Cada pequeño paso también cuenta. 😊",
+  () => "Confío en ti. Poco a poco estás logrando cosas increíbles. 🌈",
+];
+
+let bienvenidaMostrada = false;
+let temporizadorInactividad;
+let mensajesInactivos = 0;
+
+function programarMensajeInactividad() {
+  clearTimeout(temporizadorInactividad);
+  mensajesInactivos = 0;
+  temporizadorInactividad = setTimeout(mensajeInactividad, 14000);
+}
+
+function mensajeInactividad() {
+  if (document.hidden || vistaIndice.hidden || mensajesInactivos >= 2) return;
+  const hechos = modulo.subtemas.filter((_, t) => temaCompleto(t)).length;
+  const texto = pick(FRASES_INACTIVIDAD)(hechos, modulo.subtemas.length);
+  $("mascota-mensaje").textContent = texto;
+  const avatar = $("mascota-avatar");
+  avatar.classList.remove("hablando");
+  void avatar.offsetWidth;
+  avatar.classList.add("hablando");
+  mensajesInactivos++;
+  if (mensajesInactivos < 2) temporizadorInactividad = setTimeout(mensajeInactividad, 35000);
+}
+
+const FRASES_COMPANERO = [
+  "¡Tú puedes! Confío en todo lo que has aprendido. ⭐",
+  "Respira y piensa con calma: vas muy bien. 💛",
+  "Cada ejercicio que intentas te acerca más a la meta. 🐣",
+  "¡Sigue así! Estoy muy orgulloso de ti. 🌟",
+  "No pasa nada si te equivocas; también así se aprende. 💪",
+  "¡Qué buen trabajo! Vamos paso a paso. 🎉",
+];
+
+function mostrarCompanero(frase) {
+  const burbuja = $("pollito-companero-mensaje");
+  burbuja.textContent = frase;
+  burbuja.classList.remove("frase-nueva");
+  void burbuja.offsetWidth;
+  burbuja.classList.add("frase-nueva");
+}
+
+function acompanarEstudio(fraseInicial) {
+  clearInterval(temporizadorCompanero);
+  const vistaActiva = location.hash === "#/repaso" || /^#\/\d+$/.test(location.hash);
+  const companero = $("pollito-companero");
+  const visible = vistaActiva && repasoDesbloqueado() && prog.pollitoNacio;
+  companero.hidden = !visible;
+  if (!visible) return;
+
+  $("pollito-companero-huevo").hidden = !eclosionEnCurso;
+  $("pollito-companero-img").hidden = eclosionEnCurso;
+  indiceFraseCompanero = 0;
+  repasoTerminado = location.hash === "#/repaso" && repasoCelebrado;
+  mostrarCompanero(fraseInicial || "¡Aquí estoy para acompañarte! Tú puedes. 💛");
+  temporizadorCompanero = setInterval(() => {
+    if (document.hidden || repasoTerminado) return;
+    mostrarCompanero(FRASES_COMPANERO[indiceFraseCompanero % FRASES_COMPANERO.length]);
+    indiceFraseCompanero++;
+  }, 15000);
+}
+
+document.addEventListener("pointerdown", programarMensajeInactividad, { passive: true });
+document.addEventListener("keydown", programarMensajeInactividad);
+document.addEventListener("visibilitychange", () => {
+  if (document.hidden) clearTimeout(temporizadorInactividad);
+  else programarMensajeInactividad();
+});
 
 function pintarInicio() {
   const n = modulo.subtemas.length, hechos = modulo.subtemas.map((_, t) => temaCompleto(t)), v = hechos.filter(Boolean).length;
   const abierto = repasoDesbloqueado();
-  if (!$("progreso")) $("lista").insertAdjacentHTML("beforebegin",
-    '<div class="progreso" id="progreso"><div class="barra"><div class="relleno" id="prog-barra"></div></div><p id="prog-texto"></p></div>');
-  $("prog-texto").textContent =
-    (v === 0 ? "Completa los 3 ejercicios de cada tema para llenar tu barra y desbloquear el Repaso."
-      : !abierto ? `Llevas ${v} de ${n} temas completados. ¡Completa todos para desbloquear el Repaso!`
-      : "¡Completaste todos los temas! El Repaso está desbloqueado: ¡demuestra lo que sabes!") +
-    (prog.correctas ? ` · ${prog.correctas} ejercicios del Repaso correctos` : "");
-  $("prog-barra").style.width = "0";
-  requestAnimationFrame(() => requestAnimationFrame(() => { $("prog-barra").style.width = (v / n * 100) + "%"; }));
   document.querySelectorAll("#lista li:not(.repaso)").forEach((li, i) => li.classList.toggle("visto", hechos[i]));
 
   // El botón de Repaso está bloqueado hasta completar todos los temas
@@ -687,6 +870,15 @@ function pintarInicio() {
     setTimeout(() => confeti(li, 80), 700);
   }
   $("intro-modulo").textContent = pick(FRASES);
+  if (!bienvenidaMostrada) {
+    bienvenidaMostrada = true;
+    $("mascota-mensaje").textContent = abierto
+      ? "¡Bienvenido de vuelta, campeón! Completaste todos los temas. ¡Estoy muy orgullosa de ti! 🎉"
+      : mascotaAusente
+        ? "¡Qué alegría que volviste! Te extrañé mucho. Me hace feliz acompañarte. 💜"
+        : pick(SALUDOS_MASCOTA);
+    programarMensajeInactividad();
+  }
 }
 
 $("lista").addEventListener("click", (e) => {   // si está bloqueado, no entra: solo se sacude
@@ -767,10 +959,16 @@ function actualizarMarcador() {
     else caja.innerHTML = htmlBloqueo(`La solución se verá cuando termines todos los ejercicios (llevas ${ok} de ${total}).`);
   });
   if (completo && !repasoCelebrado) { repasoCelebrado = true; confeti($("marcador"), 80); }
+  if (completo && !repasoTerminado) {
+    repasoTerminado = true;
+    mostrarCompanero("¡Terminaste todo el repaso! Gracias por estudiar conmigo. ¡Estoy muy orgulloso de ti! 🎉🐣");
+    confeti($("pollito-companero"), 60);
+  }
 }
 
 // Mostrar la vista según la dirección (#/ o #/3)
 function mostrar() {
+  actualizarMascota();
   if (location.hash === "#/repaso" && !repasoDesbloqueado()) {   // bloqueado: vuelve al inicio
     history.replaceState(null, "", "#/");
     mostrar();
@@ -782,6 +980,7 @@ function mostrar() {
     vistaRepaso.hidden = false;
     document.title = "Repaso · " + modulo.titulo;
     if (!repasoActivo) dibujarRepaso();
+    acompanarEstudio("¡Llegamos al repaso! Tú puedes con cada ejercicio. 💛");
     window.scrollTo(0, 0);
     return;
   }
@@ -795,6 +994,8 @@ function mostrar() {
   if (!sub) {
     vistaDetalle.hidden = true;
     vistaIndice.hidden = false;
+    $("pollito-companero").hidden = true;
+    clearInterval(temporizadorCompanero);
     document.title = modulo.titulo;
     pintarInicio();
     return;
@@ -802,6 +1003,7 @@ function mostrar() {
 
   vistaIndice.hidden = true;
   vistaDetalle.hidden = false;
+  acompanarEstudio("¡Vamos con estos ejercicios! Confío en ti. 🐣");
   registrarVisita(i);
   document.title = `${sub.titulo} · ${modulo.titulo}`;
   $("detalle-titulo").textContent = sub.titulo;
@@ -882,10 +1084,9 @@ mostrar();
 
 
 /* ============================================================
-   IDEAS · un mini-juego distinto en cada subtema (archivo nuevo)
-   No modifica animacion.js: se "engancha" solo. Cuando abres un
-   subtema, agrega una caja "Juega y descubre" después de
-   "Cómo funciona y cómo se aplica".
+   IDEAS · un mini-juego distinto en cada subtema
+   Se "engancha" solo: cuando abres un subtema, agrega una caja
+   "Juega y descubre" después de "Cómo funciona y cómo se aplica".
    El orden de JUEGOS coincide con los subtemas 1.1, 1.2, 1.3...
    ============================================================ */
 (function () {
@@ -900,10 +1101,14 @@ mostrar();
   const fiesta = (el, n) => { if (typeof confeti === "function" && el) confeti(el, n); };
   const mt = (s) => (typeof mate === "function" ? mate(s) : s);
   const vivo = (el) => el && el.isConnected;
+  // Reinicia una animación CSS (clase) para que se vea cada vez
+  const anima = (el, cls) => { if (!el || reducido) return; el.classList.remove(cls); void el.offsetWidth; el.classList.add(cls); };
+  const llenar = (barra, parte, total) => { barra.style.width = Math.max(2, Math.min(100, (parte / total) * 100)) + "%"; };
+  const BARRA = '<div class="barra jg-barra" aria-hidden="true"><div class="relleno"></div></div>';
 
   // Cuenta animada de un número en pantalla
   function contar(el, hasta) {
-    const desde = Number((el.dataset.v || "0")), t0 = performance.now(), dur = ms(500);
+    const desde = Number(el.dataset.v || "0"), t0 = performance.now(), dur = ms(500);
     el.dataset.v = hasta;
     if (!dur) { el.textContent = fm(hasta); return; }
     (function paso(t) {
@@ -918,21 +1123,24 @@ mostrar();
     const cuenta = (o, r) =>
       o && r ? [10000, "10 × 10 × 10 × 10 = 10,000: cada posición tiene 10 opciones."]
       : o ? [5040, "10 × 9 × 8 × 7 = 5,040: cada dígito usado ya no vuelve."]
-      : r ? [715, "Sin orden y con repetición: 715. ¡Ya no cuentan 1123 y 3211 como distintas!"]
-      : [210, "Sin orden y sin repetición: 210. Solo importa qué dígitos son, no en qué orden."];
+      : r ? [715, "Sin orden y con repetición: 715. ¡1123 y 3211 ya cuentan como la misma!"]
+      : [210, "Sin orden y sin repetición: 210. Solo importa qué dígitos son."];
     b.innerHTML = `
-      <p class="jg-intro">Una caja fuerte de <strong>4 dígitos</strong> (del 0 al 9). Mueve los interruptores y mira cuántas claves posibles tiene. Luego intenta abrirla.</p>
+      <p class="jg-intro">Caja fuerte de <strong>4 dígitos</strong> (0–9). Mueve los interruptores y mira cuántas claves hay.</p>
       <div class="jg-fila">
         <label class="jg-sw"><input type="checkbox" class="o" checked><i></i>¿Importa el orden?</label>
         <label class="jg-sw"><input type="checkbox" class="r" checked><i></i>¿Se puede repetir?</label>
       </div>
-      <div class="jg-gran"><span class="num">0</span><small>claves posibles 🔐</small></div>
+      <div class="jg-gran"><span class="num">0</span><small><span class="cerr">🔐</span> claves posibles</small></div>
       <p class="jg-nota"></p>
       <div class="jg-resp"><input class="pin" inputmode="numeric" maxlength="4" placeholder="PIN de 4 dígitos" aria-label="Prueba un PIN"><button type="button" class="jg-btn">Probar 🔓</button></div>
       <p class="jg-msg" role="status"></p>`;
-    const o = b.querySelector(".o"), r = b.querySelector(".r"), num = b.querySelector(".num"),
-      nota = b.querySelector(".jg-nota"), pin = b.querySelector(".pin"), msg = b.querySelector(".jg-msg");
-    const act = () => { const [n, t] = cuenta(o.checked, r.checked); contar(num, n); nota.textContent = t; msg.textContent = ""; };
+    const o = b.querySelector(".o"), r = b.querySelector(".r"), num = b.querySelector(".num"), gran = b.querySelector(".jg-gran"),
+      cerr = b.querySelector(".cerr"), nota = b.querySelector(".jg-nota"), pin = b.querySelector(".pin"), msg = b.querySelector(".jg-msg");
+    const act = () => {
+      const [n, t] = cuenta(o.checked, r.checked); contar(num, n); nota.textContent = t; msg.textContent = "";
+      gran.classList.remove("abierta"); cerr.textContent = "🔐"; anima(gran, "bump");
+    };
     o.addEventListener("change", act); r.addEventListener("change", act); act();
     pin.addEventListener("input", () => { pin.value = pin.value.replace(/\D/g, ""); });
     const probar = () => {
@@ -941,14 +1149,17 @@ mostrar();
       if (p.length !== 4) { msg.textContent = "Escribe 4 dígitos."; return; }
       const veces = {}; for (const d of p) veces[d] = (veces[d] || 0) + 1;
       if (!r.checked && Object.values(veces).some((v) => v > 1)) {
-        msg.classList.add("jg-mal"); msg.textContent = "🚫 La caja la rechaza: tiene dígitos repetidos y aquí no se puede repetir."; return;
+        msg.classList.add("jg-mal"); msg.textContent = "🚫 La caja la rechaza: tiene dígitos repetidos.";
+        anima(gran, "sacude"); return;
       }
       msg.classList.add("jg-ok");
       if (!o.checked) {
         const orden = fa(4) / Object.values(veces).reduce((x, v) => x * fa(v), 1);
-        msg.textContent = `✅ ¡Abierta! Como el orden no importa, esos mismos dígitos abren la caja de ${orden} formas distintas.`;
-      } else msg.textContent = "✅ ¡Abierta! Con orden, cambiar la posición de un solo dígito ya sería otra clave.";
-      fiesta(msg, 30);
+        msg.textContent = `✅ ¡Abierta! Sin importar el orden, esos dígitos abren la caja de ${orden} formas.`;
+      } else msg.textContent = "✅ ¡Abierta! Con orden, mover un solo dígito ya sería otra clave.";
+      cerr.textContent = "🔓"; gran.classList.add("abierta");
+      setTimeout(() => { if (vivo(gran)) { gran.classList.remove("abierta"); cerr.textContent = "🔐"; } }, 2200);
+      fiesta(gran, 24);
     };
     b.querySelector(".jg-btn").addEventListener("click", probar);
     pin.addEventListener("keydown", (e) => { if (e.key === "Enter") probar(); });
@@ -957,7 +1168,7 @@ mostrar();
   /* ---------- 1.2 DOMINÓ EN CADENA ---------- */
   function juego12(b) {
     b.innerHTML = `
-      <p class="jg-intro">Cada ficha es un número. Cuando cae una, empuja a la siguiente y el producto crece. Elige cuántas fichas y empuja la primera.</p>
+      <p class="jg-intro">Elige cuántas fichas y empuja la primera: cada una arrastra a la siguiente.</p>
       <label class="jg-rango">n = <strong class="n">5</strong><input type="range" min="1" max="10" value="5" aria-label="Valor de n"></label>
       <div class="jg-domino"></div>
       <p class="jg-calc"></p>
@@ -967,7 +1178,7 @@ mostrar();
     let corriendo = false;
     const dibujar = () => {
       const n = +rango.value; nEl.textContent = n;
-      fila.innerHTML = Array.from({ length: n }, (_, i) => `<span class="jg-ficha">${n - i}</span>`).join("");
+      fila.innerHTML = Array.from({ length: n }, (_, i) => `<span class="jg-ficha" style="--k:${i}">${n - i}</span>`).join("");
       calc.textContent = `Toca «Empujar» para armar ${n}!`;
     };
     rango.addEventListener("input", () => { if (!corriendo) dibujar(); });
@@ -981,11 +1192,12 @@ mostrar();
         if (!vivo(f)) return;
         f.classList.add("cae"); prod *= n - i;
         calc.textContent = Array.from({ length: i + 1 }, (_, k) => n - k).join(" × ") + " = " + fm(prod);
+        anima(calc, "bump");
         if (i === n - 1) {
           corriendo = false; btn.disabled = false; rango.disabled = false;
-          calc.innerHTML = `${n}! = ${fm(fa(n))}` + (n > 1 ? `<br><small>= ${n} × ${n - 1}! = ${n} × ${fm(fa(n - 1))}: la ficha grande empuja a todo el resto.</small>` : "") +
+          calc.innerHTML = `${n}! = ${fm(fa(n))}` + (n > 1 ? `<br><small>= ${n} × ${n - 1}! = ${n} × ${fm(fa(n - 1))}</small>` : "") +
             (n === 10 ? "<br><small>¡Con solo 10 fichas ya pasas de 3 millones! 🚀</small>" : "");
-          fiesta(calc, 30);
+          anima(calc, "bump"); fiesta(calc, 24);
         }
       }, ms(i * 380)));
     });
@@ -994,9 +1206,9 @@ mostrar();
 
   /* ---------- 1.3 EL MONSTRUO COME-FACTORIALES ---------- */
   function juego13(b) {
-    let a, bb, exp, sel, hecho;
+    let a, bb, exp, sel, hecho, timer;
     b.innerHTML = `
-      <p class="jg-intro">El monstruo solo come <strong>factoriales iguales</strong> (uno arriba y uno abajo). Primero expande la fracción y luego toca los dos que se pueden cancelar. ¡Cuidado con los números sueltos!</p>
+      <p class="jg-intro">El monstruo solo come <strong>factoriales iguales</strong> (uno arriba y uno abajo). Expande y tócalos.</p>
       <div class="jg-monstruo" aria-hidden="true">👾</div>
       <p class="jg-msg" role="status"></p>
       <div class="jg-frac">
@@ -1006,20 +1218,25 @@ mostrar();
     const arriba = b.querySelector(".arriba"), abajo = b.querySelector(".abajo"), msg = b.querySelector(".jg-msg"),
       mon = b.querySelector(".jg-monstruo"), bExp = b.querySelector(".exp");
     const decir = (t, cls) => { msg.className = "jg-msg " + (cls || ""); msg.textContent = t; };
-    const escupe = (t) => { decir(t, "jg-mal"); mon.classList.remove("sacude"); void mon.offsetWidth; mon.classList.add("sacude"); };
+    const cara = (e, clase) => {
+      mon.textContent = e; mon.classList.remove("sacude", "come"); void mon.offsetWidth; if (!reducido) mon.classList.add(clase);
+      clearTimeout(timer); timer = setTimeout(() => { if (vivo(mon)) { mon.textContent = "👾"; mon.classList.remove("sacude", "come"); } }, 1400);
+    };
+    const escupe = (t) => { decir(t, "jg-mal"); cara("🤢", "sacude"); };
     function nuevo() {
       bb = R(3, 7); a = bb + R(2, 3); exp = false; sel = null; hecho = false;
       arriba.innerHTML = `<button type="button" class="jg-chip fact" data-t="f" data-l="a">${a}!</button>`;
       abajo.innerHTML = `<button type="button" class="jg-chip fact" data-t="f" data-l="b">${bb}!</button>`;
-      bExp.disabled = false; bExp.textContent = `Expandir ${a}!`;
-      decir("Tengo hambre… 😋 Expande " + a + "! para encontrar un " + bb + "! escondido.");
+      bExp.disabled = false; bExp.textContent = `Expandir ${a}!`; mon.textContent = "👾";
+      decir(`Tengo hambre 😋 Expande ${a}! para encontrar un ${bb}! escondido.`);
     }
     bExp.addEventListener("click", () => {
       if (exp || hecho) return;
       exp = true; bExp.disabled = true; sel = null;
-      arriba.innerHTML = Array.from({ length: a - bb }, (_, i) => `<button type="button" class="jg-chip num" data-t="n" data-l="a">${a - i}</button>`).join("<span>×</span>") +
-        `<span>×</span><button type="button" class="jg-chip fact" data-t="f" data-l="a">${bb}!</button>`;
-      decir(`${a}! = ${Array.from({ length: a - bb }, (_, i) => a - i).join(" × ")} × ${bb}!  ¿Ves el ${bb}! escondido? Tócalo arriba y abajo.`);
+      const n = a - bb;
+      arriba.innerHTML = Array.from({ length: n }, (_, i) => `<button type="button" class="jg-chip num" data-t="n" data-l="a" style="--k:${i}">${a - i}</button>`).join("<span>×</span>") +
+        `<span>×</span><button type="button" class="jg-chip fact" data-t="f" data-l="a" style="--k:${n}">${bb}!</button>`;
+      decir(`${a}! = ${Array.from({ length: n }, (_, i) => a - i).join(" × ")} × ${bb}!  ¿Ves el ${bb}! escondido? Tócalo arriba y abajo.`);
     });
     b.querySelector(".nuevo").addEventListener("click", nuevo);
     b.addEventListener("click", (e) => {
@@ -1030,13 +1247,13 @@ mostrar();
       const par = [sel, c]; sel.classList.remove("sel"); sel = null;
       const dosF = par.every((x) => x.dataset.t === "f"), lados = par[0].dataset.l !== par[1].dataset.l;
       if (dosF && lados) {
-        if (!exp) return escupe(`🤢 ${a}! y ${bb}! no son iguales todavía. Primero expande ${a}!.`);
+        if (!exp) return escupe(`${a}! y ${bb}! no son iguales todavía. Primero expande ${a}!.`);
         par.forEach((x) => x.classList.add("comido")); hecho = true;
         const nums = Array.from({ length: a - bb }, (_, i) => a - i), p = nums.reduce((x, y) => x * y, 1);
-        decir(`😋 ¡Ñam! Se cancelaron los ${bb}!. Queda ${nums.join(" × ")} = ${fm(p)}.`, "jg-ok");
-        fiesta(mon, 40);
-      } else if (dosF) escupe("🤢 ¡Puaj! Esos dos están del mismo lado: no se cancelan entre sí.");
-      else escupe("🤢 ¡Puaj! Un factorial solo se cancela con otro factorial igual, nunca con un número suelto. (4! ≠ 4)");
+        decir(`😋 ¡Ñam! Quedó ${nums.join(" × ")} = ${fm(p)}.`, "jg-ok");
+        cara("😋", "come"); fiesta(mon, 24);
+      } else if (dosF) escupe("Esos dos están del mismo lado: no se cancelan entre sí.");
+      else escupe("¡Puaj! Un factorial solo se cancela con otro factorial igual, no con un número suelto (4! ≠ 4).");
     });
     nuevo();
   }
@@ -1051,29 +1268,30 @@ mostrar();
     const sel = { pan: 0, carne: 0, salsa: 0 };
     let nSalsa = 3;
     b.innerHTML = `
-      <p class="jg-intro">Arma tu hamburguesa: en cada fila eliges <strong>una</strong> opción. Agrega salsas y mira cómo se dispara el total.</p>
+      <p class="jg-intro">Elige <strong>una</strong> opción por fila y agrega salsas: mira cómo se dispara el total.</p>
       <div class="filas"></div>
-      <div class="jg-fila"><button type="button" class="jg-btn mas">+ Agregar salsa</button><button type="button" class="jg-btn menos">− Quitar salsa</button><button type="button" class="jg-btn azar">🎲 Sorpréndeme</button></div>
+      <div class="jg-fila"><button type="button" class="jg-btn mas">+ Salsa</button><button type="button" class="jg-btn menos">− Salsa</button><button type="button" class="jg-btn azar">🎲 Sorpréndeme</button></div>
       <div class="jg-burger" aria-live="polite"></div>
       <div class="jg-cuenta"></div>`;
     const filas = b.querySelector(".filas"), burger = b.querySelector(".jg-burger"), cuenta = b.querySelector(".jg-cuenta");
-    function pintar() {
+    function pintar(nuevoTotal) {
       filas.innerHTML = Object.entries(D).map(([k, [tit, ops]]) => {
         const n = k === "salsa" ? nSalsa : ops.length;
         return `<div class="jg-menu-fila"><b>${tit}</b>${ops.slice(0, n).map((o, i) => `<button type="button" class="jg-chip" data-f="${k}" data-i="${i}" aria-pressed="${sel[k] === i}">${o}</button>`).join("")}</div>`;
       }).join("");
-      burger.textContent = `🍞 ${D.pan[1][sel.pan]} + 🥩 ${D.carne[1][sel.carne]} + 🧴 ${D.salsa[1][sel.salsa]}`;
+      burger.innerHTML = `<span style="--k:0">🍞</span><span style="--k:1">🧴</span><span style="--k:2">🥩</span><span style="--k:3">🍞</span><small>${D.pan[1][sel.pan]} · ${D.carne[1][sel.carne]} · ${D.salsa[1][sel.salsa]}</small>`;
       const np = D.pan[1].length, nc = D.carne[1].length, tot = np * nc * nSalsa;
-      cuenta.innerHTML = `<span class="o">«o»</span> En cada fila eliges UNA opción (se suma): ${np} + ${nc} + ${nSalsa} = ${np + nc + nSalsa} ingredientes.<br>
-        <span class="y">«y»</span> Pero la hamburguesa lleva pan Y carne Y salsa (se multiplica): ${np} × ${nc} × ${nSalsa} = <strong>${tot}</strong> hamburguesas distintas.`;
+      cuenta.innerHTML = `<span class="o">«o»</span> En cada fila eliges UNA (se suma): ${np} + ${nc} + ${nSalsa} = ${np + nc + nSalsa} ingredientes.<br>
+        <span class="y">«y»</span> Pero la hamburguesa lleva pan Y carne Y salsa (se multiplica): ${np} × ${nc} × ${nSalsa} = <strong>${tot}</strong> hamburguesas.`;
+      if (nuevoTotal) anima(cuenta, "bump");
       b.querySelector(".mas").disabled = nSalsa >= 6;
       b.querySelector(".menos").disabled = nSalsa <= 1;
     }
     b.addEventListener("click", (e) => {
       const c = e.target.closest(".jg-chip[data-f]");
       if (c) { sel[c.dataset.f] = +c.dataset.i; pintar(); return; }
-      if (e.target.closest(".mas") && nSalsa < 6) { nSalsa++; pintar(); fiesta(cuenta, 14); }
-      else if (e.target.closest(".menos") && nSalsa > 1) { nSalsa--; sel.salsa = Math.min(sel.salsa, nSalsa - 1); pintar(); }
+      if (e.target.closest(".mas") && nSalsa < 6) { nSalsa++; pintar(true); fiesta(cuenta, 10); }
+      else if (e.target.closest(".menos") && nSalsa > 1) { nSalsa--; sel.salsa = Math.min(sel.salsa, nSalsa - 1); pintar(true); }
       else if (e.target.closest(".azar")) { sel.pan = R(0, 2); sel.carne = R(0, 2); sel.salsa = R(0, nSalsa - 1); pintar(); }
     });
     pintar();
@@ -1094,28 +1312,28 @@ mostrar();
     ];
     const NOM = { C: "Combinación", V: "Variación", P: "Permutación" };
     const FOR = { C: "C[n,r] = {n!}/{(n−r)! · r!}", V: "V[n,r] = {n!}/{(n−r)!}", P: "P(n) = n!" };
-    let mazo = [], racha = 0, caso, r;
+    let mazo = [], racha = 0, caso, r, subio = false;
     const real = () => (caso[1] ? (caso[2] ? "P" : "V") : "C");
     const veredicto = () => (r.o === 0 ? "C" : r.o === 1 && r.t === 1 ? "P" : r.o === 1 && r.t === 0 ? "V" : null);
-    function siguiente() { if (!mazo.length) mazo = mezclar(CASOS); caso = mazo.pop(); r = { o: null, t: null, fin: null }; pintar(); }
-    function pintar() {
+    function siguiente() { if (!mazo.length) mazo = mezclar(CASOS); caso = mazo.pop(); r = { o: null, t: null, fin: null }; pintar(true); }
+    function pintar(esNuevo) {
       const v = veredicto();
       const luz = (k, cls) => `<i class="${v === k ? cls : ""}"></i>`;
       const pres = (cond) => (cond ? ' aria-pressed="true"' : "");
       let fin = "";
-      if (r.fin === "ok") fin = `<p class="jg-msg jg-ok">✅ ¡Caso resuelto! Es <strong>${NOM[v]}</strong>. ${caso[3]}</p><div class="jg-formula">${mt(FOR[v])}</div><div class="jg-fila"><button type="button" class="jg-btn" data-a="sig">Siguiente caso →</button></div>`;
-      if (r.fin === "mal") fin = `<p class="jg-msg jg-mal">🤔 El detective duda… Pista: piensa si cambiar el orden cambia el resultado y si se usan todos los elementos.</p><div class="jg-fila"><button type="button" class="jg-btn" data-a="otra">Intentar de nuevo</button></div>`;
+      if (r.fin === "ok") fin = `<p class="jg-msg jg-ok">✅ ¡Resuelto! Es <strong>${NOM[v]}</strong>. ${caso[3]}</p><div class="jg-formula">${mt(FOR[v])}</div><div class="jg-fila"><button type="button" class="jg-btn" data-a="sig">Siguiente caso →</button></div>`;
+      if (r.fin === "mal") fin = `<p class="jg-msg jg-mal">🤔 El detective duda… ¿cambiar el orden cambia el resultado? ¿se usan todos los elementos?</p><div class="jg-fila"><button type="button" class="jg-btn" data-a="otra">Intentar de nuevo</button></div>`;
       b.querySelector(".cuerpo").innerHTML = `
-        <p class="jg-intro">Lee el caso y responde las preguntas del detective: el semáforo dará el veredicto. Resuelve 5 seguidos para ganar la placa.</p>
-        <p class="jg-caso">📁 ${caso[0]}</p>
+        <p class="jg-caso ${esNuevo ? "nuevo" : r.fin || ""}">📁 ${caso[0]}</p>
         <div class="jg-semaforo" aria-label="Semáforo del veredicto">${luz("C", "on-v")}${luz("V", "on-a")}${luz("P", "on-r")}</div>
         <p class="jg-nota jg-centro">🟢 Combinación · 🟡 Variación · 🔴 Permutación</p>
         <div class="jg-fila"><b>¿Importa el orden?</b><button type="button" class="jg-chip" data-q="o1"${pres(r.o === 1)}>Sí</button><button type="button" class="jg-chip" data-q="o0"${pres(r.o === 0)}>No</button></div>
         ${r.o === 1 ? `<div class="jg-fila"><b>¿Se usan todos los elementos?</b><button type="button" class="jg-chip" data-q="t1"${pres(r.t === 1)}>Sí</button><button type="button" class="jg-chip" data-q="t0"${pres(r.t === 0)}>No</button></div>` : ""}
         ${fin}
-        <p class="jg-racha">🔥 Racha: ${racha} / 5 ${racha >= 5 ? '<span class="jg-placa">🕵️ Placa de detective</span>' : ""}</p>`;
+        <p class="jg-racha"><span class="llama${subio ? " sube" : ""}">🔥</span> Racha: ${racha} / 5 ${racha >= 5 ? '<span class="jg-placa">🕵️ Placa de detective</span>' : ""}</p>`;
+      subio = false;
     }
-    b.insertAdjacentHTML("beforeend", '<div class="cuerpo"></div>');
+    b.insertAdjacentHTML("beforeend", '<p class="jg-intro">Responde las preguntas del detective. 5 aciertos seguidos = placa.</p><div class="cuerpo"></div>');
     b.addEventListener("click", (e) => {
       const q = e.target.closest("[data-q]"), a = e.target.closest("[data-a]");
       if (a) { if (a.dataset.a === "sig") siguiente(); else { r = { o: null, t: null, fin: null }; pintar(); } return; }
@@ -1125,48 +1343,64 @@ mostrar();
       if (k === "o") { r.o = val; r.t = null; } else r.t = val;
       const v = veredicto();
       if (v) {
-        if (v === real()) { racha++; r.fin = "ok"; } else { racha = 0; r.fin = "mal"; }
+        if (v === real()) { racha++; r.fin = "ok"; subio = true; } else { racha = 0; r.fin = "mal"; }
       }
       pintar();
-      if (r.fin === "ok") { fiesta(b.querySelector(".jg-semaforo"), racha === 5 ? 90 : 24); }
+      if (r.fin === "ok") fiesta(b.querySelector(".jg-semaforo"), racha === 5 ? 60 : 18);
     });
     siguiente();
   }
 
-  /* ---------- 1.6 MESA GIRATORIA Y LETRAS GEMELAS ---------- */
+  /* ---------- 1.6 MESA GIRATORIA Y LETRAS GEMELAS (dos pestañas) ---------- */
   function juego16(b) {
     b.innerHTML = `
-      <p class="jg-sub">🪑 Parte 1 · La mesa giratoria (permutación circular)</p>
-      <p class="jg-intro">Personas en una mesa redonda. Agrega o quita personas y gira la mesa: ¿cambia algo?</p>
-      <div class="jg-fila" style="justify-content:center">
-        <button type="button" class="jg-btn menosp">− Quitar persona</button>
-        <strong class="np"></strong>
-        <button type="button" class="jg-btn masp">+ Agregar persona</button>
+      <div class="jg-tabs" role="tablist">
+        <button type="button" class="jg-tab on" role="tab" aria-selected="true" data-p="1">🪑 Mesa giratoria</button>
+        <button type="button" class="jg-tab" role="tab" aria-selected="false" data-p="2">🔤 Letras gemelas</button>
       </div>
-      <div class="jg-mesa"><div class="jg-mesa-rot"></div></div>
-      <div class="jg-fila" style="justify-content:center">
-        <button type="button" class="jg-btn girar">↻ Girar la mesa</button>
-        <button type="button" class="jg-btn fijar">📌 Fijar a Ana</button>
-        <button type="button" class="jg-btn mezclar" disabled>🔀 Mezclar a los demás</button>
+      <div class="jg-panel" data-p="1">
+        <p class="jg-intro">Agrega o quita personas y gira la mesa: ¿cambia algo? (permutación circular)</p>
+        <div class="jg-fila" style="justify-content:center">
+          <button type="button" class="jg-btn menosp">− Persona</button>
+          <strong class="np"></strong>
+          <button type="button" class="jg-btn masp">+ Persona</button>
+        </div>
+        <div class="jg-mesa"><div class="jg-mesa-rot"></div></div>
+        <div class="jg-fila" style="justify-content:center">
+          <button type="button" class="jg-btn girar">↻ Girar</button>
+          <button type="button" class="jg-btn fijar">📌 Fijar a Ana</button>
+          <button type="button" class="jg-btn mezclar" disabled>🔀 Mezclar</button>
+        </div>
+        <p class="jg-msg mesa-msg" role="status"></p>
+        <div class="mesa-barra">${BARRA}</div>
       </div>
-      <p class="jg-msg mesa-msg" role="status"></p>
-      <p class="jg-sub">🔤 Parte 2 · Letras gemelas (permutación con repetidos)</p>
-      <p class="jg-intro">Elige una palabra o escribe la tuya (de 2 a 11 letras). Las letras iguales son gemelas: barájalas y cuenta las palabras distintas.</p>
-      <div class="jg-fila palabras" style="justify-content:center"></div>
-      <div class="jg-resp"><input class="mipal" maxlength="11" placeholder="Tu palabra" aria-label="Escribe tu palabra"><button type="button" class="jg-btn usar">Usar mi palabra</button></div>
-      <div class="jg-fichas"></div>
-      <div class="jg-fila" style="justify-content:center">
-        <button type="button" class="jg-btn baraja">🔀 Barajar</button>
-        <button type="button" class="jg-btn baraja10">🔀 Barajar ×10</button>
-        <button type="button" class="jg-btn swap">↔ Intercambiar dos gemelas</button>
-        <button type="button" class="jg-btn why">¿Por qué?</button>
-      </div>
-      <p class="jg-msg letras-msg" role="status"></p>
-      <div class="jg-formula"></div>`;
+      <div class="jg-panel" data-p="2" hidden>
+        <p class="jg-intro">Elige o escribe una palabra y baraja las fichas. Las letras iguales son gemelas. (permutación con repetidos)</p>
+        <div class="jg-fila palabras" style="justify-content:center"></div>
+        <div class="jg-resp"><input class="mipal" maxlength="11" placeholder="Tu palabra" aria-label="Escribe tu palabra (2 a 11 letras)"><button type="button" class="jg-btn usar">Usar</button></div>
+        <div class="jg-fichas"></div>
+        <div class="jg-fila" style="justify-content:center">
+          <button type="button" class="jg-btn baraja">🔀 Barajar</button>
+          <button type="button" class="jg-btn baraja10">×10</button>
+          <button type="button" class="jg-btn swap">↔ Gemelas</button>
+          <button type="button" class="jg-btn why">¿Por qué?</button>
+        </div>
+        <p class="jg-msg letras-msg" role="status"></p>
+        <div class="letras-barra">${BARRA}</div>
+        <div class="jg-formula"></div>
+      </div>`;
+
+    // Pestañas
+    b.querySelector(".jg-tabs").addEventListener("click", (e) => {
+      const t = e.target.closest(".jg-tab"); if (!t) return;
+      b.querySelectorAll(".jg-tab").forEach((x) => { const on = x === t; x.classList.toggle("on", on); x.setAttribute("aria-selected", String(on)); });
+      b.querySelectorAll(".jg-panel").forEach((p) => { p.hidden = p.dataset.p !== t.dataset.p; });
+    });
 
     // --- Mesa (de 3 a 8 personas) ---
     const NOM = ["Ana", "Beto", "Carla", "Dani", "Elsa", "Fer", "Gus", "Hugo"], EMO = ["👩", "🧑", "👧", "👦", "👵", "👨", "🧒", "👴"];
-    const rotEl = b.querySelector(".jg-mesa-rot"), mmsg = b.querySelector(".mesa-msg"), npEl = b.querySelector(".np");
+    const rotEl = b.querySelector(".jg-mesa-rot"), mmsg = b.querySelector(".mesa-msg"), npEl = b.querySelector(".np"),
+      mBarra = b.querySelector(".mesa-barra .relleno");
     let n = 5, asientos = [], rot = 0, fija = false; const vistas = new Set();
     const personas = NOM.map((nombre, p) => {
       const d = document.createElement("div");
@@ -1188,37 +1422,39 @@ mostrar();
     }
     function cambiarN(d) {
       n = Math.max(3, Math.min(8, n + d));
-      asientos = Array.from({ length: n }, (_, i) => i); rot = 0; vistas.clear();
-      npEl.textContent = `${n} personas`;
+      asientos = Array.from({ length: n }, (_, i) => i); rot = 0; vistas.clear(); llenar(mBarra, 0, 1);
+      npEl.textContent = `${n} personas`; anima(npEl, "bump");
       b.querySelector(".menosp").disabled = n <= 3; b.querySelector(".masp").disabled = n >= 8;
       colocar();
-      dm(`Con ${n} personas hay (${n}−1)! = ${n - 1}! = ${fm(fa(n - 1))} formas distintas (sin contar los giros).`, "jg-ok");
+      if (d > 0) anima(personas[n - 1], "entra");
+      dm(`Con ${n} personas: (${n}−1)! = ${n - 1}! = ${fm(fa(n - 1))} formas distintas.`, "jg-ok");
     }
     b.querySelector(".menosp").addEventListener("click", () => cambiarN(-1));
     b.querySelector(".masp").addEventListener("click", () => cambiarN(1));
     b.querySelector(".girar").addEventListener("click", () => {
       rot += 360 / n; colocar();
-      dm(fija ? "Ana sigue siendo la referencia: girar no crea ninguna disposición nueva."
-              : "¡Todos se movieron, pero cada uno conserva a los mismos vecinos! Es la MISMA disposición. Por eso no se cuenta como nueva.");
+      dm(fija ? "Ana es la referencia: girar no crea una disposición nueva."
+              : "¡Todos se movieron, pero cada uno conserva a los mismos vecinos! Es la MISMA disposición.");
     });
     b.querySelector(".fijar").addEventListener("click", (e) => {
       fija = !fija; e.target.textContent = fija ? "📌 Soltar a Ana" : "📌 Fijar a Ana";
       b.querySelector(".mezclar").disabled = !fija; colocar();
-      dm(fija ? `Con Ana fija ya hay un punto de partida: los otros ${n - 1} se ordenan libremente → (${n}−1)! = ${n - 1}! = ${fm(fa(n - 1))} formas.` : "Sin una persona fija, girar la mesa genera copias de la misma disposición.", fija ? "jg-ok" : "");
+      if (fija) anima(personas[0], "entra");
+      dm(fija ? `Con Ana fija, los otros ${n - 1} se ordenan libremente: ${n - 1}! = ${fm(fa(n - 1))} formas.` : "Sin una persona fija, girar la mesa genera copias de la misma disposición.", fija ? "jg-ok" : "");
     });
     b.querySelector(".mezclar").addEventListener("click", () => {
       rot = Math.ceil(rot / 360) * 360;
       asientos = [0, ...mezclar(Array.from({ length: n - 1 }, (_, i) => i + 1))]; vistas.add(asientos.join(","));
       colocar();
-      const total = fa(n - 1);
-      dm(`Disposiciones distintas vistas: ${fm(vistas.size)} de ${fm(total)}.`, "jg-ok");
-      if (vistas.size === total) fiesta(mmsg, 70);
+      const total = fa(n - 1); llenar(mBarra, vistas.size, total);
+      dm(`Disposiciones vistas: ${fm(vistas.size)} de ${fm(total)}.`, "jg-ok");
+      if (vistas.size === total) fiesta(mmsg, 50);
     });
     cambiarN(0);
 
     // --- Letras gemelas (palabra a elección) ---
     const lf = b.querySelector(".jg-fichas"), lmsg = b.querySelector(".letras-msg"), form = b.querySelector(".jg-formula"),
-      cajaPal = b.querySelector(".palabras"), entrada = b.querySelector(".mipal");
+      cajaPal = b.querySelector(".palabras"), entrada = b.querySelector(".mipal"), lBarra = b.querySelector(".letras-barra .relleno");
     const SUG = ["ANA", "PAPA", "SALA", "LLAMA", "BANANA", "MATEMATICAS"];
     cajaPal.innerHTML = SUG.map((w) => `<button type="button" class="jg-chip" data-w="${w}">${w}</button>`).join("");
     let palabra = "", fichas = [], total = 0; const palabras = new Set();
@@ -1226,37 +1462,38 @@ mostrar();
     const conteo = (w) => { const c = {}; for (const x of w) c[x] = (c[x] || 0) + 1; return c; };
     function usar(w) {
       w = w.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toUpperCase().replace(/[^A-ZÑ]/g, "");
-      if (w.length < 2 || w.length > 11) { dl("Escribe una palabra de 2 a 11 letras (solo letras).", "jg-mal"); return; }
-      palabra = w; palabras.clear(); form.innerHTML = "";
-      const c = conteo(w), vistoK = {};
-      const orden = [...new Set(w)];
+      if (w.length < 2 || w.length > 11) { dl("Escribe una palabra de 2 a 11 letras (solo letras).", "jg-mal"); anima(entrada, "sacude"); return; }
+      palabra = w; palabras.clear(); form.innerHTML = ""; llenar(lBarra, 0, 1);
+      const c = conteo(w), vistoK = {}, orden = [...new Set(w)];
       fichas = [...w].map((l) => { vistoK[l] = (vistoK[l] || 0) + 1; return { l, s: c[l] > 1 ? vistoK[l] : 0, col: orden.indexOf(l) % 5 + 1 }; });
       total = fa(w.length) / Object.values(c).reduce((x, m) => x * fa(m), 1);
       cajaPal.querySelectorAll(".jg-chip").forEach((x) => x.setAttribute("aria-pressed", String(x.dataset.w === w)));
-      dibujar();
+      dibujar(null, true);
       dl(`${w}: hay ${fm(total)} ordenamientos distintos. ¡Baraja y encuentra los que puedas!`);
     }
-    function dibujar(giran) {
-      lf.innerHTML = fichas.map((f, i) => `<span class="jg-letra${fichas.length > 7 ? " chica" : ""}${giran && giran.includes(i) ? " gira" : ""}" style="--lc:var(--c${f.col})">${f.l}${f.s ? `<sub>${f.s}</sub>` : ""}</span>`).join("");
+    function dibujar(giran, cae) {
+      lf.innerHTML = fichas.map((f, i) => `<span class="jg-letra${fichas.length > 7 ? " chica" : ""}${giran && giran.includes(i) ? " gira" : ""}${cae ? " baja" : ""}" style="--lc:var(--c${f.col});--k:${i}">${f.l}${f.s ? `<sub>${f.s}</sub>` : ""}</span>`).join("");
     }
     function estado() {
       const w = fichas.map((f) => f.l).join("");
-      if (palabras.size === total) { dl(`🎉 ¡Encontraste las ${fm(total)} palabras distintas! Las ${fm(fa(palabra.length))} formas con fichas numeradas se reducen a ${fm(total)}.`, "jg-ok"); porque(); fiesta(lf, 60); }
-      else dl(`Ahora: ${w}. Palabras distintas encontradas: ${fm(palabras.size)} de ${fm(total)}.` + (total > 1000 ? " ¡Imposible hallarlas todas a mano! Para eso existe la fórmula." : ""), "jg-ok");
+      llenar(lBarra, palabras.size, total);
+      if (palabras.size === total) { dl(`🎉 ¡Las ${fm(total)} palabras! Las ${fm(fa(palabra.length))} formas con fichas numeradas se reducen a ${fm(total)}.`, "jg-ok"); porque(); fiesta(lf, 50); }
+      else dl(`Ahora: ${w}. Distintas encontradas: ${fm(palabras.size)} de ${fm(total)}.` + (total > 1000 ? " ¡Imposible hallarlas todas a mano! Para eso existe la fórmula." : ""), "jg-ok");
     }
     function porque() {
       const c = conteo(palabra), reps = Object.values(c).filter((m) => m > 1), den = reps.reduce((x, m) => x * fa(m), 1), L = palabra.length;
       form.innerHTML = mt(reps.length ? `{${L}!}/{${reps.map((m) => m + "!").join(" · ")}} = ${fm(fa(L))} / ${fm(den)} = ${fm(total)}` : `${L}! = ${fm(total)}`);
+      anima(form, "bump");
     }
     function barajar1() { fichas = mezclar(fichas); palabras.add(fichas.map((f) => f.l).join("")); }
-    b.querySelector(".baraja").addEventListener("click", () => { barajar1(); dibujar(); estado(); });
-    b.querySelector(".baraja10").addEventListener("click", () => { for (let i = 0; i < 10; i++) barajar1(); dibujar(); estado(); });
+    b.querySelector(".baraja").addEventListener("click", () => { barajar1(); dibujar(null, true); estado(); });
+    b.querySelector(".baraja10").addEventListener("click", () => { for (let i = 0; i < 10; i++) barajar1(); dibujar(null, true); estado(); });
     b.querySelector(".swap").addEventListener("click", () => {
       const c = conteo(palabra), l = [...palabra].find((x) => c[x] > 1);
-      if (!l) { dl("Esta palabra no tiene letras repetidas: no hay gemelas que intercambiar, así que todas sus ordenaciones son distintas.", "jg-mal"); return; }
+      if (!l) { dl("Esta palabra no tiene letras repetidas: no hay gemelas que intercambiar.", "jg-mal"); anima(lf, "sacude"); return; }
       const idx = fichas.map((f, i) => (f.l === l ? i : -1)).filter((i) => i >= 0);
       [fichas[idx[0]], fichas[idx[1]]] = [fichas[idx[1]], fichas[idx[0]]]; dibujar([idx[0], idx[1]]);
-      dl(`Cambiaron de lugar dos ${l} (${l}₁ y ${l}₂), pero la palabra sigue siendo ${fichas.map((f) => f.l).join("")}. Por eso se divide entre ${c[l]}!.`);
+      dl(`Cambiaron de lugar dos ${l}, pero la palabra sigue siendo ${fichas.map((f) => f.l).join("")}. Por eso se divide entre ${c[l]}!.`);
     });
     b.querySelector(".why").addEventListener("click", porque);
     cajaPal.addEventListener("click", (e) => { const c = e.target.closest("[data-w]"); if (c) { entrada.value = ""; usar(c.dataset.w); } });
@@ -1272,7 +1509,7 @@ mostrar();
     ["👾 Juega y descubre: el monstruo come-factoriales", juego13, "--c5"],
     ["🍔 Juega y descubre: armador de hamburguesas", juego14, "--c4"],
     ["🕵️ Juega y descubre: el semáforo detective", juego15, "--c3"],
-    ["🪑 Juega y descubre: mesa giratoria y letras gemelas", juego16, "--c1"],
+    ["🪑 Juega y descubre: mesa y letras gemelas", juego16, "--c1"],
   ];
   const cont = document.getElementById("detalle-contenido");
   if (!cont) return;
