@@ -44,7 +44,7 @@ h1 {
 
 /* Entradas suaves */
 @keyframes subir { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: none; } }
-.lista li, .progreso, .tres-cajas .caja, .tema-titulo, .ejercicio, .marcador {
+.lista li, .mascota, .tres-cajas .caja, .tema-titulo, .ejercicio, .marcador {
   animation: subir .55s cubic-bezier(.2, .8, .2, 1) both;
   animation-delay: calc(var(--i, 0) * 80ms);
 }
@@ -59,12 +59,64 @@ h1 {
   background: linear-gradient(90deg, var(--c4), var(--c1), var(--c5));
   transition: width .9s cubic-bezier(.2, .8, .2, 1);
 }
-.progreso, .marcador {
+.marcador {
   background: var(--panel); border-radius: 16px; padding: 14px 18px;
   box-shadow: 0 6px 18px rgba(27, 31, 59, .1);
 }
-.progreso { margin: 0 0 22px; }
-.progreso p, .marcador strong { display: block; margin: 8px 0 0; font-weight: 700; }
+.mascota {
+  display: flex; align-items: center; gap: 14px; flex-wrap: wrap; margin: 0 0 22px; padding: 14px 18px;
+  background: var(--panel); border: 1px solid var(--linea); border-left: 6px solid var(--c5);
+  border-radius: 16px; box-shadow: 0 6px 18px rgba(27, 31, 59, .1);
+  transition: border-color .25s, background .25s;
+}
+.mascota-avatar {
+  display: grid; place-items: center; flex: none; padding: 4px; border: 0; border-radius: 50%; background: transparent; color: inherit;
+  font: inherit; font-size: 2.5rem; line-height: 1; cursor: pointer;
+  animation: mascota-brillo 3s ease-in-out infinite;
+}
+.mascota-pollito { width: 4.5rem; height: 4.5rem; margin: -.75rem; object-fit: cover; clip-path: inset(20% 15% 15%); mix-blend-mode: multiply; }
+.mascota-avatar:hover { filter: brightness(1.08); }
+.mascota-avatar:focus-visible { outline: 3px solid var(--c5); outline-offset: 3px; }
+.mascota-info { flex: 1 1 220px; min-width: 0; }
+.mascota-info strong { display: block; }
+.mascota-info output { display: block; margin: 3px 0 0; color: var(--suave); font-size: .94rem; }
+.mascota-progreso { flex: none; color: var(--suave); font-size: .85rem; font-weight: 700; }
+.mascota-barra { height: 8px; margin-top: 8px; overflow: hidden; border-radius: 99px; background: rgba(27, 31, 59, .1); }
+.mascota-barra span { display: block; width: 0; height: 100%; border-radius: inherit; background: linear-gradient(90deg, var(--c4), var(--c1), var(--c5)); transition: width .6s ease; }
+.mascota.feliz { border-left-color: var(--c3); background: #effcf6; }
+.mascota.feliz .mascota-avatar { animation: jg-latido .5s 2; }
+.mascota.feliz .mascota-avatar.hablando { animation: mascota-salto .65s, mascota-brillo 3s .65s ease-in-out infinite; }
+.mascota-avatar.eclosionado, .mascota.feliz .mascota-avatar.eclosionado { animation: mascota-eclosion .8s cubic-bezier(.3, 1.6, .5, 1); }
+.mascota-avatar.eclosionando { position: relative; }
+.mascota-avatar.eclosionando #mascota-emoji { display: inline-block; animation: huevo-sacude .85s ease-in-out both; }
+.mascota-avatar.eclosionando #mascota-pollito { display: none; }
+.mascota-avatar.eclosionando::after {
+  content: ""; position: absolute; z-index: 2; top: 28%; left: 48%; width: 12px; height: 38px;
+  background: #7a4b22;
+  clip-path: polygon(40% 0, 100% 22%, 45% 36%, 85% 55%, 25% 65%, 60% 100%, 0 72%, 35% 54%, 0 35%);
+  opacity: 0; animation: mostrar-grieta .3s .55s forwards;
+}
+.mascota.triste { border-left-color: #9aa0b8; background: #f1f2f7; }
+.mascota.triste .mascota-avatar { filter: grayscale(.75); transform: rotate(-10deg); }
+@keyframes mascota-brillo { 0%, 100% { filter: drop-shadow(0 0 0 rgba(255, 159, 28, 0)); } 50% { filter: drop-shadow(0 0 8px rgba(255, 159, 28, .55)); } }
+@keyframes mascota-salto { 35% { transform: translateY(-12px) scale(1.25) rotate(-8deg); } 70% { transform: translateY(2px) scale(.92) rotate(6deg); } }
+@keyframes mascota-eclosion { 0% { transform: scale(.25) rotate(-25deg); opacity: .2; } 65% { transform: scale(1.3) rotate(8deg); } 100% { transform: scale(1) rotate(0); opacity: 1; } }
+@keyframes huevo-sacude { 0%, 100% { transform: rotate(0); } 15%, 45%, 75% { transform: rotate(-12deg); } 30%, 60%, 90% { transform: rotate(12deg); } }
+@keyframes mostrar-grieta { to { opacity: 1; } }
+.pollito-companero {
+  position: fixed; z-index: 20; right: max(18px, env(safe-area-inset-right)); bottom: max(18px, env(safe-area-inset-bottom));
+  display: flex; align-items: center; gap: 10px; width: min(330px, calc(100vw - 32px));
+  padding: 10px 14px; border: 1px solid rgba(27, 31, 59, .12); border-radius: 20px;
+  background: rgba(255, 255, 255, .96); box-shadow: 0 8px 28px rgba(27, 31, 59, .2);
+}
+.pollito-companero[hidden] { display: none; }
+.pollito-companero-huevo { flex: none; font-size: 3.2rem; line-height: 1; }
+.pollito-companero-img { flex: none; width: 64px; height: 64px; object-fit: cover; clip-path: inset(20% 15% 15%); mix-blend-mode: multiply; animation: mascota-flota 3s ease-in-out infinite; }
+.pollito-companero output { color: var(--tinta); font-size: .92rem; font-weight: 700; line-height: 1.35; }
+.pollito-companero output.frase-nueva { animation: jg-entra .35s ease both; }
+.pollito-companero.eclosionando .pollito-companero-huevo { animation: huevo-sacude .85s ease-in-out both; }
+.pollito-companero.eclosionando .pollito-companero-huevo::after { content: "〽"; display: block; margin-top: -26px; color: #9e5316; font-size: 1.3rem; text-align: center; }
+.marcador strong { display: block; margin: 8px 0 0; font-weight: 700; }
 .marcador { position: sticky; top: 10px; z-index: 5; margin: 0 0 22px; }
 .marcador strong { margin: 0 0 8px; }
 
@@ -171,7 +223,7 @@ h1 {
 }
 .luz-on::before { opacity: 1; }
 
-/* ---- Tres recuadros dentro de cada subtema ---- */
+
 .contenido {
   background: var(--panel); border: 1px solid var(--linea); border-top: 5px solid var(--c1);
   border-radius: 16px; padding: 28px 26px; max-width: 70ch;
@@ -320,19 +372,39 @@ h1 {
 
 
 /* ============================================================
-   IDEAS · mini-juegos de cada subtema (archivo nuevo)
-   Usa los mismos colores --c1 a --c5 de diseño.css.
-   Cada juego pinta su caja con --cc.
+   IDEAS · mini-juegos de cada subtema
+   Usa los mismos colores --c1 a --c5. Cada juego pinta su caja con --cc.
    ============================================================ */
+
+/* Corrección: en celular las cajas no se salen de la pantalla */
+.contenido.tres-cajas { grid-template-columns: minmax(0, 1fr); }
+.caja { min-width: 0; }
+
 .caja-juego { --cc: var(--c2); }
-.caja-juego .jg-intro { color: var(--suave); }
+.caja-juego .jg-intro { color: var(--suave); margin-bottom: 14px; }
 .caja-juego .jg-sub { margin: 22px 0 8px; font-weight: 800; color: var(--cc); }
-.caja-juego .jg-msg, .caja-juego .jg-nota { min-height: 1.6em; margin: 10px 0 0; font-weight: 600; }
-.caja-juego .jg-nota { color: var(--suave); font-weight: 500; font-size: .95rem; }
+.caja-juego .jg-msg, .caja-juego .jg-nota { min-height: 1.6em; margin: 12px 0 0; font-weight: 600; }
+.caja-juego .jg-nota { color: var(--suave); font-weight: 500; font-size: .95rem; margin-bottom: 14px; }
 .caja-juego .jg-ok { color: #0a8f66; }
 .caja-juego .jg-mal { color: #d6336c; }
 .caja-juego .jg-fila { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; margin: 12px 0; }
 .caja-juego .jg-centro { text-align: center; }
+.caja-juego .jg-formula { text-align: center; font-size: 1.15rem; margin: 10px 0; color: var(--formula); overflow-x: auto; }
+.caja-juego .jg-barra { height: 10px; margin: 10px auto 0; max-width: 360px; }
+
+/* Animaciones reutilizables (se activan con JS al hacer algo) */
+@keyframes jg-entra { from { opacity: 0; transform: translateY(14px) scale(.97); } }
+@keyframes jg-pop { from { transform: scale(0) rotate(-20deg); } }
+@keyframes jg-bump { 40% { transform: scale(1.07); } }
+@keyframes jg-sacude { 20%, 60% { transform: translateX(-9px) rotate(-3deg); } 40%, 80% { transform: translateX(9px) rotate(3deg); } }
+@keyframes jg-flota { 50% { transform: translateY(-8px) rotate(3deg); } }
+@keyframes jg-chomp { 25% { transform: scale(1.35, .8); } 50% { transform: scale(.85, 1.3); } 75% { transform: scale(1.2, .9); } }
+@keyframes jg-latido { 50% { transform: scale(1.3); } }
+@keyframes jg-cae-letra { from { opacity: 0; transform: translateY(-20px) rotate(-10deg); } }
+.jg-cuerpo { animation: jg-entra .45s cubic-bezier(.2, .8, .2, 1) both; }
+.bump { animation: jg-bump .4s; }
+.sacude { animation: jg-sacude .5s; }
+.entra { animation: jg-pop .5s cubic-bezier(.3, 1.6, .5, 1); }
 
 /* Botones */
 .jg-btn, .jg-chip {
@@ -341,9 +413,17 @@ h1 {
   border-radius: 99px; padding: 8px 16px; transition: transform .15s, background .2s, color .2s;
 }
 .jg-btn:hover:not(:disabled), .jg-chip:hover:not(:disabled) { background: var(--cc); color: #fff; transform: translateY(-2px); }
+.jg-btn:active:not(:disabled), .jg-chip:active:not(:disabled) { transform: scale(.94); }
 .jg-btn:disabled, .jg-chip:disabled { opacity: .45; cursor: not-allowed; }
-.jg-btn:focus-visible, .jg-chip:focus-visible, .jg-sw input:focus-visible + i, .jg-resp input:focus-visible, .jg-rango input:focus-visible { outline: 3px solid var(--c5); outline-offset: 2px; }
+.jg-btn:focus-visible, .jg-chip:focus-visible, .jg-tab:focus-visible, .jg-sw input:focus-visible + i, .jg-resp input:focus-visible, .jg-rango input:focus-visible { outline: 3px solid var(--c5); outline-offset: 2px; }
 .jg-chip[aria-pressed="true"], .jg-chip.sel { background: var(--cc); color: #fff; }
+
+/* Pestañas (juego 1.6) */
+.jg-tabs { display: flex; gap: 8px; padding: 5px; border-radius: 99px; background: rgba(27, 31, 59, .07); margin-bottom: 14px; }
+.jg-tab { flex: 1; font: inherit; font-weight: 800; border: 0; border-radius: 99px; padding: 9px 8px; background: transparent; color: var(--suave); cursor: pointer; transition: background .25s, color .25s, transform .15s; }
+.jg-tab.on { background: var(--cc); color: #fff; box-shadow: 0 3px 10px rgba(27, 31, 59, .2); }
+.jg-panel { animation: jg-entra .4s cubic-bezier(.2, .8, .2, 1) both; }
+.jg-panel[hidden] { display: none; }
 
 /* 1.1 Interruptores y caja fuerte */
 .jg-sw { display: inline-flex; align-items: center; gap: 10px; font-weight: 700; cursor: pointer; }
@@ -352,9 +432,12 @@ h1 {
 .jg-sw i::after { content: ""; position: absolute; top: 3px; left: 3px; width: 22px; height: 22px; border-radius: 50%; background: #fff; box-shadow: 0 2px 4px rgba(0,0,0,.25); transition: transform .25s cubic-bezier(.3, 1.6, .5, 1); }
 .jg-sw input:checked + i { background: var(--c3); }
 .jg-sw input:checked + i::after { transform: translateX(24px); }
-.jg-gran { text-align: center; margin: 14px 0 4px; padding: 14px; border-radius: 16px; background: #1b1f3b; color: #fff; }
+.jg-gran { text-align: center; margin: 14px 0 4px; padding: 14px; border-radius: 16px; background: #1b1f3b; color: #fff; transition: box-shadow .4s; }
+.jg-gran.abierta { box-shadow: 0 0 0 4px #28e0a0, 0 0 28px rgba(40, 224, 160, .6); }
 .jg-gran .num { display: block; font: 800 clamp(2.2rem, 9vw, 3.4rem)/1.1 Georgia, serif; color: #7dffcf; text-shadow: 0 0 14px rgba(125, 255, 207, .55); }
 .jg-gran small { opacity: .8; }
+.jg-gran .cerr { display: inline-block; transition: transform .3s; }
+.jg-gran.abierta .cerr { animation: jg-latido .6s 2; }
 .jg-resp { display: flex; gap: 8px; flex-wrap: wrap; }
 .jg-resp input { flex: 1 1 170px; font: inherit; padding: 8px 14px; border-radius: 99px; border: 2px solid var(--linea); letter-spacing: .25em; text-align: center; }
 
@@ -366,59 +449,63 @@ h1 {
   flex: 0 1 36px; height: 72px; display: grid; place-items: center; border-radius: 6px;
   background: linear-gradient(var(--cc), color-mix(in srgb, var(--cc) 70%, #000)); color: #fff; font-weight: 800; font-size: 1.15rem;
   transform-origin: bottom right; transition: transform .35s cubic-bezier(.5, 0, .8, .6), opacity .35s;
+  animation: jg-entra .4s both; animation-delay: calc(var(--k, 0) * 50ms);
 }
 .jg-ficha.cae { transform: rotate(78deg) translateY(4px); opacity: .85; }
 .jg-calc { font: 700 1.1rem Georgia, serif; text-align: center; min-height: 3.2em; }
 
 /* 1.3 Monstruo */
-.jg-monstruo { font-size: 3rem; text-align: center; line-height: 1; }
+.jg-monstruo { font-size: 3rem; text-align: center; line-height: 1; animation: jg-flota 3.2s ease-in-out infinite; }
+.jg-monstruo.come { animation: jg-chomp .7s; }
 .jg-monstruo.sacude { animation: jg-sacude .5s; }
-@keyframes jg-sacude { 20%, 60% { transform: translateX(-10px) rotate(-6deg); } 40%, 80% { transform: translateX(10px) rotate(6deg); } }
 .jg-frac { display: grid; gap: 10px; margin: 14px auto; max-width: 480px; }
 .jg-fila-f { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; align-items: center; min-height: 44px; }
 .jg-linea { height: 4px; border-radius: 4px; background: var(--tinta); }
-.jg-chip.comido { transform: scale(0); opacity: 0; pointer-events: none; transition: transform .5s, opacity .5s; }
+.jg-chip.comido { transform: scale(0) rotate(40deg); opacity: 0; pointer-events: none; transition: transform .5s, opacity .5s; }
 .jg-chip.num { border-color: var(--suave); color: var(--suave); }
 .jg-chip.num:hover:not(:disabled), .jg-chip.num.sel { background: var(--suave); color: #fff; }
 .jg-chip.fact { font-family: Georgia, serif; }
+.jg-fila-f .jg-chip { animation: jg-pop .4s cubic-bezier(.3, 1.6, .5, 1) both; animation-delay: calc(var(--k, 0) * 60ms); }
 
 /* 1.4 Hamburguesa */
 .jg-menu-fila { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin: 10px 0; }
 .jg-menu-fila b { flex: 0 0 64px; }
-.jg-burger { font-size: 2.2rem; text-align: center; margin: 12px 0 0; }
-.jg-cuenta { margin: 10px 0 0; padding: 12px 16px; border-radius: 12px; background: #fff6e3; border-left: 6px solid var(--c4); font-weight: 600; }
+.jg-burger { text-align: center; margin: 14px 0 0; line-height: 1.15; }
+.jg-burger span { display: block; font-size: 1.35rem; line-height: 1.05; animation: jg-cae-letra .45s cubic-bezier(.3, 1.4, .5, 1) both; animation-delay: calc(var(--k, 0) * 90ms); }
+.jg-burger small { display: block; margin-top: 6px; color: var(--suave); font-weight: 700; }
+.jg-cuenta { margin: 12px 0 0; padding: 12px 16px; border-radius: 12px; background: #fff6e3; border-left: 6px solid var(--c4); font-weight: 600; }
 .jg-cuenta .y { color: var(--c3); font-weight: 800; }
 .jg-cuenta .o { color: var(--c5); font-weight: 800; }
 
 /* 1.5 Semáforo */
 .jg-caso { font-weight: 700; padding: 14px 16px; border-radius: 12px; background: #eef4ff; border-left: 6px solid var(--c2); }
+.jg-caso.nuevo { animation: jg-entra .5s cubic-bezier(.2, .8, .2, 1) both; }
+.jg-caso.mal { animation: jg-sacude .5s; border-left-color: #d6336c; }
+.jg-caso.ok { animation: jg-bump .5s; border-left-color: var(--c3); background: #effcf6; }
 .jg-semaforo { display: flex; gap: 10px; justify-content: center; padding: 10px 14px; margin: 14px auto; width: max-content; border-radius: 99px; background: #1b1f3b; }
-.jg-semaforo i { width: 30px; height: 30px; border-radius: 50%; background: #3a3f66; transition: background .3s, box-shadow .3s; }
-.jg-semaforo i.on-v { background: #28e0a0; box-shadow: 0 0 14px #28e0a0; }
-.jg-semaforo i.on-a { background: #ffc93c; box-shadow: 0 0 14px #ffc93c; }
-.jg-semaforo i.on-r { background: #ff5c8a; box-shadow: 0 0 14px #ff5c8a; }
+.jg-semaforo i { width: 30px; height: 30px; border-radius: 50%; background: #3a3f66; }
+.jg-semaforo i.on-v { background: #28e0a0; box-shadow: 0 0 14px #28e0a0; animation: jg-latido .6s 2; }
+.jg-semaforo i.on-a { background: #ffc93c; box-shadow: 0 0 14px #ffc93c; animation: jg-latido .6s 2; }
+.jg-semaforo i.on-r { background: #ff5c8a; box-shadow: 0 0 14px #ff5c8a; animation: jg-latido .6s 2; }
 .jg-racha { font-weight: 800; }
-.jg-placa { display: inline-block; margin-top: 8px; padding: 6px 14px; border-radius: 10px; background: linear-gradient(135deg, #ffe08a, #ffb300); color: #5a3b00; font-weight: 800; animation: jg-pop .6s cubic-bezier(.3, 1.6, .5, 1); }
-@keyframes jg-pop { from { transform: scale(0) rotate(-20deg); } }
-
-/* Fórmulas dentro de los juegos */
-.caja-juego .jg-formula { text-align: center; font-size: 1.15rem; margin: 10px 0; color: var(--formula); }
+.jg-racha .llama { display: inline-block; }
+.jg-racha .llama.sube { animation: jg-latido .5s; }
+.jg-placa { display: inline-block; margin-left: 6px; padding: 6px 14px; border-radius: 10px; background: linear-gradient(135deg, #ffe08a, #ffb300); color: #5a3b00; font-weight: 800; animation: jg-pop .6s cubic-bezier(.3, 1.6, .5, 1); }
 
 /* 1.6 Mesa y letras */
-.jg-mesa { position: relative; width: 240px; height: 240px; margin: 14px auto; }
+.jg-mesa { position: relative; width: 240px; height: 240px; margin: 14px auto; max-width: 100%; }
 .jg-mesa-rot { position: absolute; inset: 0; border-radius: 50%; background: radial-gradient(circle, #ffe9b8 0 55%, transparent 56%); transition: transform .7s cubic-bezier(.4, 1.3, .5, 1); }
-.jg-persona { position: absolute; width: 46px; height: 46px; border-radius: 50%; display: grid; place-items: center; font-size: 1.5rem; background: #fff; border: 3px solid var(--p, var(--c2)); transition: transform .7s cubic-bezier(.4, 1.3, .5, 1); }
+.jg-persona { position: absolute; width: 46px; height: 46px; border-radius: 50%; display: grid; place-items: center; font-size: 1.5rem; background: #fff; border: 3px solid var(--p, var(--c2)); transition: transform .7s cubic-bezier(.4, 1.3, .5, 1), left .5s, top .5s; }
 .jg-persona small { position: absolute; bottom: -18px; font-size: .7rem; font-weight: 800; color: var(--tinta); }
-.jg-persona { transition: transform .7s cubic-bezier(.4, 1.3, .5, 1), left .5s, top .5s; }
 .jg-persona.fija { box-shadow: 0 0 0 4px #ffd400; }
+.jg-persona.oculta { display: none; }
 .jg-fichas { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; margin: 14px 0; }
 .jg-letra { position: relative; width: 52px; height: 60px; display: grid; place-items: center; border-radius: 10px; font: 800 1.7rem Georgia, serif; color: #fff; background: var(--lc, var(--c5)); box-shadow: 0 4px 0 rgba(0,0,0,.2); }
 .jg-letra.chica { width: 38px; height: 46px; font-size: 1.3rem; }
-.jg-persona.oculta { display: none; }
 .jg-letra sub { position: absolute; right: 6px; bottom: 4px; font: 700 .7rem system-ui; opacity: .85; }
+.jg-letra.baja { animation: jg-cae-letra .4s cubic-bezier(.3, 1.4, .5, 1) both; animation-delay: calc(var(--k, 0) * 45ms); }
 .jg-letra.gira { animation: jg-pop .45s; }
 
 @media (prefers-reduced-motion: reduce) {
-  .jg-mesa-rot, .jg-persona, .jg-ficha, .jg-chip.comido, .jg-semaforo i { transition: none; }
-  .jg-monstruo.sacude, .jg-placa, .jg-letra.gira { animation: none; }
+  .caja-juego *, .jg-cuerpo, .jg-panel { animation: none !important; transition: none !important; }
 }
