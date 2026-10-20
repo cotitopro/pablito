@@ -459,7 +459,7 @@ const FORMULAS_EJ = [   // fórmulas que se muestran como ayuda en cada ejercici
 
 // ---- REPASO: pantalla, ejercicios sin repetir y borrado al salir ----
 $("lista").insertAdjacentHTML("beforeend",
-  `<li class="repaso" style="--i:${modulo.subtemas.length + 1}"><a href="#/repaso"><span class="num">★</span><span class="nombre">Repaso: ¡pon a prueba lo aprendido!</span></a></li>`);
+  `<li class="repaso" style="--i:${modulo.subtemas.length + 2}"><a href="#/repaso"><span class="num">★</span><span class="nombre">Repaso: ¡pon a prueba lo aprendido!</span></a></li>`);
 
 const vistaRepaso = document.createElement("section");
 vistaRepaso.id = "vista-repaso";
@@ -468,11 +468,49 @@ vistaRepaso.hidden = true;
 vistaRepaso.innerHTML = `
   <a class="volver" href="#/">← Volver al módulo</a>
   <h2>Repaso</h2>
-  <p class="modulo">Ejercicios nuevos cada vez que entras. Desliza hacia abajo para ver los demás temas. Las soluciones se desbloquean al terminar todos los ejercicios.</p>
+  <p class="modulo">Ejercicios nuevos cada vez que entras. Desliza hacia abajo para ver los demás temas. Califica la hoja cuando quieras para revisar las respuestas y ver las soluciones.</p>
   <div class="marcador" id="marcador"><strong id="marc-texto"></strong><div class="barra"><div class="relleno" id="marc-barra"></div></div></div>
-  <div class="repaso-acciones"><button type="button" class="btn-nuevos" id="btn-nuevos">Nuevos ejercicios</button></div>
+  <div class="repaso-acciones">
+    <button type="button" class="btn-nuevos" id="btn-nuevos">Nuevos ejercicios</button>
+    <button type="button" class="btn-calificar" id="btn-calificar-hoja">Calificar hoja</button>
+    <p class="hoja-calificacion" id="hoja-calificacion" role="status">Califica la hoja para ver todas las soluciones, incluso si dejaste respuestas vacías.</p>
+  </div>
+  <section class="hoja-records" aria-labelledby="hoja-records-titulo">
+    <div class="hoja-records-cabecera">
+      <div><h3 id="hoja-records-titulo">🏆 Mejores tiempos</h3><p>Tus tres récords de la Hoja de ejercicios.</p></div>
+      <output id="hoja-tiempo" role="timer" aria-live="off">Tiempo: 0:00</output>
+    </div>
+    <div class="hoja-records-tabla">
+      <table>
+        <thead><tr><th>#</th><th>Fecha y hora</th><th>Tiempo</th></tr></thead>
+        <tbody class="hoja-records-filas"></tbody>
+      </table>
+    </div>
+  </section>
   <div id="repaso-contenido"></div>`;
 document.querySelector("main").appendChild(vistaRepaso);
+
+const itemJuegos = document.createElement("li");
+itemJuegos.className = "juegos";
+itemJuegos.style.setProperty("--i", modulo.subtemas.length + 1);
+itemJuegos.innerHTML = `<a href="#/juegos"><span class="num">🎮</span><span class="nombre">Minijuegos: aprende jugando</span></a>`;
+$("lista").insertBefore(itemJuegos, $("lista").querySelector(".repaso"));
+
+const vistaJuegos = document.createElement("section");
+vistaJuegos.id = "vista-juegos";
+vistaJuegos.className = "detalle juegos";
+vistaJuegos.hidden = true;
+vistaJuegos.innerHTML = `
+  <a class="volver" href="#/">← Volver al módulo</a>
+  <h2>Minijuegos de combinatoria</h2>
+  <p class="modulo">Elige un juego, prueba ideas de las seis lecciones y diviértete. Los aciertos del Reto del huevo hacen crecer a tu mascota.</p>
+  <div class="minijuegos-menu" id="minijuegos-menu" aria-label="Elige un minijuego"></div>
+  <section class="caja caja-juego minijuego-activo" id="minijuego-activo" hidden>
+    <button type="button" class="minijuegos-volver" id="minijuegos-volver">← Todos los juegos</button>
+    <h3 class="caja-titulo" id="minijuego-titulo"></h3>
+    <div class="jg-cuerpo" id="minijuego-cuerpo"></div>
+  </section>`;
+document.querySelector("main").appendChild(vistaJuegos);
 
 // Memoria de ejercicios ya vistos (para que los nuevos sean diferentes)
 const CLAVE_VISTOS = "modulo1_repaso_vistos";
@@ -498,6 +536,15 @@ const normaliza = (t) => String(t).trim().toLowerCase().normalize("NFD")
   .replace(/[\u0300-\u036f]/g, "").replace(/[\s,.]/g, "");
 let ejerciciosActivos = {};   // se vacía al salir del repaso
 let repasoActivo = false;
+let repasoCalificada = false;
+let inicioHojaMs = 0;
+let temporizadorHoja;
+let hojaRegistroGuardado = false;
+
+function formatearTiempo(ms) {
+  const segundos = Math.floor(ms / 1000);
+  return `${Math.floor(segundos / 60)}:${String(segundos % 60).padStart(2, "0")}`;
+}
 
 // HTML de un ejercicio (sirve para el Repaso y para los ejercicios fijos de cada tema)
 function htmlEjercicio(ej, id, n, extra, fijo) {
@@ -518,6 +565,16 @@ const htmlBloqueo = (txt) => `<p class="ej-bloqueo">🔒 ${txt}</p>`;
 
 function dibujarRepaso() {
   ejerciciosActivos = {};
+  repasoCalificada = false;
+  hojaRegistroGuardado = false;
+  clearInterval(temporizadorHoja);
+  inicioHojaMs = Date.now();
+  $("hoja-calificacion").textContent = "Califica la hoja para ver todas las soluciones, incluso si dejaste respuestas vacías.";
+  $("hoja-tiempo").textContent = "Tiempo: 0:00";
+  temporizadorHoja = setInterval(() => {
+    $("hoja-tiempo").textContent = `Tiempo: ${formatearTiempo(Date.now() - inicioHojaMs)}`;
+  }, 1000);
+  dibujarRecordsHoja();
   let html = "";
   modulo.subtemas.forEach((sub, t) => {
     if (!GEN[t]) return;
@@ -542,6 +599,7 @@ function dibujarRepaso() {
 
 function limpiarRepaso() {            // al salir, los ejercicios se borran
   if (!repasoActivo) return;
+  clearInterval(temporizadorHoja);
   $("repaso-contenido").innerHTML = "";
   ejerciciosActivos = {};
   repasoActivo = false;
@@ -573,7 +631,6 @@ function comprobarEjercicio(art) {
         guardarProg();
         actualizarPractica(art.closest(".caja-practica"));
         reaccionarMascota(!temaYaCompleto && temaCompleto(tema));
-        if (!temaYaCompleto && repasoDesbloqueado()) iniciarEclosion(art.querySelector(".ej-comprobar"));
       } else {
         prog.correctas++;
         guardarProg();
@@ -606,6 +663,95 @@ $("detalle-contenido").addEventListener("keydown", (e) => {
   if (e.key === "Enter" && e.target.matches(".ej-resp input")) comprobarEjercicio(e.target.closest(".ejercicio"));
 });
 $("btn-nuevos").addEventListener("click", () => { dibujarRepaso(); window.scrollTo(0, 0); });
+
+const CLAVE_RECORDS_HOJA = "modulo1_hoja_ejercicios_records";
+function leerRecordsHoja() {
+  try {
+    const guardados = JSON.parse(localStorage.getItem(CLAVE_RECORDS_HOJA) || "[]");
+    if (!Array.isArray(guardados)) return [];
+    return guardados
+      .filter((record) => Number.isFinite(record.tiempoMs) && record.tiempoMs >= 0 && typeof record.fecha === "string" && Number.isFinite(Date.parse(record.fecha)))
+      .sort((a, z) => a.tiempoMs - z.tiempoMs)
+      .slice(0, 3);
+  } catch (error) {
+    console.error("No se pudieron leer los récords de la Hoja de ejercicios.", error);
+    return [];
+  }
+}
+function dibujarRecordsHoja(records = leerRecordsHoja()) {
+  const filas = $("vista-repaso").querySelector(".hoja-records-filas");
+  filas.replaceChildren();
+  if (!records.length) {
+    const fila = document.createElement("tr");
+    const celda = document.createElement("td");
+    celda.colSpan = 3;
+    celda.textContent = "Califica una hoja para guardar tu primer récord.";
+    fila.appendChild(celda);
+    filas.appendChild(fila);
+    return;
+  }
+  const fechaFormato = new Intl.DateTimeFormat("es-GT", { dateStyle: "short", timeStyle: "short" });
+  records.forEach((record, index) => {
+    const fila = document.createElement("tr");
+    const puesto = document.createElement("th");
+    puesto.scope = "row";
+    puesto.textContent = String(index + 1);
+    const fecha = document.createElement("td");
+    fecha.textContent = fechaFormato.format(new Date(record.fecha));
+    const tiempo = document.createElement("td");
+    tiempo.textContent = formatearTiempo(record.tiempoMs);
+    fila.append(puesto, fecha, tiempo);
+    filas.appendChild(fila);
+  });
+}
+function registrarRecordHoja() {
+  if (hojaRegistroGuardado) return true;
+  hojaRegistroGuardado = true;
+  clearInterval(temporizadorHoja);
+  const tiempoMs = Math.max(0, Date.now() - inicioHojaMs);
+  $("hoja-tiempo").textContent = `Tiempo final: ${formatearTiempo(tiempoMs)}`;
+  const records = [...leerRecordsHoja(), { fecha: new Date().toISOString(), tiempoMs }]
+    .sort((a, z) => a.tiempoMs - z.tiempoMs)
+    .slice(0, 3);
+  try {
+    localStorage.setItem(CLAVE_RECORDS_HOJA, JSON.stringify(records));
+    dibujarRecordsHoja(records);
+    return true;
+  } catch (error) {
+    console.error("No se pudo guardar el récord de la Hoja de ejercicios.", error);
+    dibujarRecordsHoja();
+    return false;
+  }
+}
+$("btn-calificar-hoja").addEventListener("click", () => {
+  const arts = [...document.querySelectorAll("#repaso-contenido .ejercicio")];
+  let correctas = 0;
+  arts.forEach((art) => {
+    const ej = ejercicioDe(art);
+    const respuesta = normaliza(art.querySelector("input").value);
+    const correcta = normaliza(ej.respuesta);
+    const acierto = Boolean(respuesta) && (respuesta === correcta || (ej.contiene && respuesta.includes(correcta)));
+    art.classList.toggle("acierto", acierto);
+    if (acierto) {
+      art.dataset.ok = "1";
+      correctas++;
+    } else {
+      delete art.dataset.ok;
+    }
+    const msg = art.querySelector(".ej-msg");
+    msg.className = `ej-msg ${acierto ? "ok" : "mal"}`;
+    msg.textContent = acierto
+      ? "Correcta."
+      : respuesta
+        ? "Incorrecta. La solución ya está disponible abajo."
+        : "Sin responder. Se cuenta como incorrecta; la solución ya está disponible abajo.";
+  });
+  repasoCalificada = true;
+  $("hoja-calificacion").textContent = `Hoja calificada: ${correctas} de ${arts.length} correctas. Ya puedes consultar todas las soluciones.`;
+  const guardado = registrarRecordHoja();
+  if (!guardado) $("hoja-calificacion").textContent += " No se pudo guardar el tiempo en este dispositivo.";
+  actualizarMarcador();
+});
 
 // Dibuja los 3 recuadros del subtema (o el bloque libre "contenido")
 function renderDetalle(sub, t) {
@@ -663,8 +809,9 @@ function iniciarSlider(raiz) {
 
 // ---- MOTIVACIÓN: progreso, frases, confeti y marcador ----
 const CLAVE_PROG = "modulo1_progreso";
-let prog = { vistos: [], correctas: 0, fijos: {}, repasoAvisado: false };
+let prog = { vistos: [], correctas: 0, fijos: {}, repasoAvisado: false, crecimientoPollito: 0 };
 try { prog = Object.assign(prog, JSON.parse(localStorage.getItem(CLAVE_PROG) || "{}")); } catch (e) {}
+prog.crecimientoPollito = Math.max(0, Math.min(5, Number(prog.crecimientoPollito) || 0));
 const guardarProg = () => { try { localStorage.setItem(CLAVE_PROG, JSON.stringify(prog)); } catch (e) {} };
 const ultimaVisita = Date.parse(prog.ultimaVisita || "");
 let mascotaAusente = Number.isFinite(ultimaVisita) && Date.now() - ultimaVisita >= 3 * 24 * 60 * 60 * 1000;
@@ -677,7 +824,6 @@ let temporizadorEclosion;
 let temporizadorCompanero;
 let indiceFraseCompanero = 0;
 let repasoTerminado = false;
-
 const FRASES = [      // una al azar cada vez que ves el inicio (puedes cambiarlas o agregar más)
   "Cada tema que dominas es un nivel que superas ⭐",
   "Empieza por donde quieras: en 10 minutos ya habrás aprendido algo nuevo.",
@@ -689,16 +835,16 @@ const FRASES = [      // una al azar cada vez que ves el inicio (puedes cambiarl
 function temaCompleto(t) { return !!GEN[t] && GEN[t].every((_, n) => prog.fijos[`${t}_${n}`]); }
 
 const repasoDesbloqueado = () => modulo.subtemas.every((_, t) => !GEN[t] || temaCompleto(t));
-if (repasoDesbloqueado() && !prog.pollitoNacio) {
-  prog.pollitoNacio = true;
+const huevoEclosiono = prog.crecimientoPollito >= 5;
+if (prog.pollitoNacio !== huevoEclosiono) {
+  prog.pollitoNacio = huevoEclosiono;
   guardarProg();
 }
 
 function actualizarMascota(feliz = false) {
-  const total = modulo.subtemas.length;
-  const completados = modulo.subtemas.filter((_, t) => temaCompleto(t)).length;
-  const porcentaje = Math.round(completados / total * 100);
-  const eclosiono = porcentaje === 100;
+  const progreso = prog.crecimientoPollito;
+  const porcentaje = Math.round(progreso / 5 * 100);
+  const eclosiono = progreso >= 5;
   const tarjeta = $("mascota");
   tarjeta.classList.toggle("triste", !feliz && mascotaAusente);
   tarjeta.classList.toggle("feliz", feliz);
@@ -706,23 +852,26 @@ function actualizarMascota(feliz = false) {
   $("mascota-emoji").hidden = eclosiono && !eclosionEnCurso;
   $("mascota-avatar").classList.toggle("eclosionado", eclosiono && !eclosionEnCurso);
   $("mascota-avatar").classList.toggle("eclosionando", eclosionEnCurso);
+  $("mascota-avatar").querySelectorAll(".mascota-grieta").forEach((grieta) => {
+    grieta.toggleAttribute("hidden", progreso < Number(grieta.dataset.etapa) || eclosiono);
+  });
   $("mascota-emoji").textContent = "🥚";
   $("mascota-nombre").textContent = `Tu mascota · ${eclosiono ? "Pollito" : "Huevo"}`;
   $("mascota-progreso").textContent = `${porcentaje}%`;
   $("mascota-barra").setAttribute("aria-valuenow", String(porcentaje));
-  $("mascota-barra").setAttribute("aria-valuetext", `${porcentaje}% · ${completados} de ${total} temas completados`);
+  $("mascota-barra").setAttribute("aria-valuetext", `${porcentaje}% · ${progreso} de 5 aciertos en el juego de crecimiento`);
   $("mascota-relleno").style.width = `${porcentaje}%`;
   $("mascota-mensaje").textContent = feliz
-    ? "¡Sí! ¡Sabía que podías! Cada acierto me llena de energía."
+    ? "¡Qué bien lo estás haciendo! ¡Sigue así!"
     : mascotaAusente
       ? "Te extrañé estos días. ¡Qué bueno que volviste!"
       : eclosiono
-        ? "¡Gracias por ayudarme a nacer! ¡Ahora te acompaño! 🐣"
-        : `Ayúdame a crecer: llevas ${completados} de ${total} temas.`;
+        ? "¡Gracias por ayudarme a nacer en el Reto del huevo! ¡Ahora te acompaño! 🐣"
+        : `Hazme crecer en el Reto del huevo: llevas ${progreso} de 5 aciertos.`;
 }
 
 function iniciarEclosion(origen) {
-  if (prog.pollitoNacio || !repasoDesbloqueado()) return;
+  if (eclosionEnCurso || !prog.pollitoNacio) return;
   prog.pollitoNacio = true;
   guardarProg();
   eclosionEnCurso = true;
@@ -752,11 +901,26 @@ function reaccionarMascota(temaTerminado = false) {
   const terminados = modulo.subtemas.filter((_, t) => temaCompleto(t)).length;
   $("mascota-mensaje").textContent = temaTerminado
     ? terminados === modulo.subtemas.length
-      ? "¡Bienvenido a tu nueva etapa! ¡Completaste todos los temas! Estoy muy orgullosa de ti. 🎉"
+      ? "¡Completaste todos los temas y desbloqueaste la hoja de ejercicios! Estoy muy orgullosa de ti. 🎉"
       : `¡Felicidades, terminaste otro tema! Ya llevas ${terminados} de ${modulo.subtemas.length}. ¡Cada paso cuenta!`
-    : "¡Sí! ¡Sabía que podías! Cada acierto me llena de energía.";
+    : "¡Sí! ¡Sabía que podías! ¡Buen trabajo!";
+  $("mascota-mensaje").hidden = false;
   clearTimeout(temporizadorMascota);
   temporizadorMascota = setTimeout(() => actualizarMascota(), 2200);
+}
+
+function registrarCrecimientoPollito(origen) {
+  if (prog.crecimientoPollito >= 5) return;
+  prog.crecimientoPollito++;
+  prog.pollitoNacio = prog.crecimientoPollito >= 5;
+  guardarProg();
+  actualizarMascota(true);
+  $("mascota-mensaje").textContent = prog.pollitoNacio
+    ? "¡El Reto del huevo completó su crecimiento! 🐣"
+    : `¡El Reto del huevo me hizo crecer! ${prog.crecimientoPollito} de 5 aciertos.`;
+  clearTimeout(temporizadorMascota);
+  temporizadorMascota = setTimeout(() => actualizarMascota(), 2200);
+  if (prog.pollitoNacio) iniciarEclosion(origen);
 }
 
 const SALUDOS_MASCOTA = [
@@ -769,6 +933,7 @@ const SALUDOS_MASCOTA = [
 $("mascota-avatar").addEventListener("click", () => {
   reaccionarMascota();
   $("mascota-mensaje").textContent = pick(SALUDOS_MASCOTA);
+  $("mascota-mensaje").hidden = false;
   const avatar = $("mascota-avatar");
   avatar.classList.remove("hablando");
   void avatar.offsetWidth;
@@ -800,6 +965,7 @@ function mensajeInactividad() {
   const hechos = modulo.subtemas.filter((_, t) => temaCompleto(t)).length;
   const texto = pick(FRASES_INACTIVIDAD)(hechos, modulo.subtemas.length);
   $("mascota-mensaje").textContent = texto;
+  $("mascota-mensaje").hidden = false;
   const avatar = $("mascota-avatar");
   avatar.classList.remove("hablando");
   void avatar.offsetWidth;
@@ -817,19 +983,45 @@ const FRASES_COMPANERO = [
   "¡Qué buen trabajo! Vamos paso a paso. 🎉",
 ];
 
+let limpiarDialogoMascota;
+function iniciarDialogoCiclico(elemento, frases) {
+  let indice = 0;
+  let temporizador;
+  function mostrarSiguiente() {
+    elemento.textContent = frases[indice % frases.length];
+    indice++;
+    elemento.hidden = false;
+    temporizador = setTimeout(() => {
+      elemento.hidden = true;
+      temporizador = setTimeout(mostrarSiguiente, 15000);
+    }, 15000);
+  }
+  mostrarSiguiente();
+  return () => {
+    clearTimeout(temporizador);
+    elemento.hidden = true;
+  };
+}
+
+function detenerDialogoMascota() {
+  if (limpiarDialogoMascota) limpiarDialogoMascota();
+  limpiarDialogoMascota = undefined;
+}
+
 function mostrarCompanero(frase) {
   const burbuja = $("pollito-companero-mensaje");
   burbuja.textContent = frase;
+  burbuja.hidden = false;
   burbuja.classList.remove("frase-nueva");
   void burbuja.offsetWidth;
   burbuja.classList.add("frase-nueva");
 }
 
 function acompanarEstudio(fraseInicial) {
-  clearInterval(temporizadorCompanero);
-  const vistaActiva = location.hash === "#/repaso" || /^#\/\d+$/.test(location.hash);
+  clearTimeout(temporizadorCompanero);
+  const vistaActiva = location.hash === "#/repaso";
   const companero = $("pollito-companero");
-  const visible = vistaActiva && repasoDesbloqueado() && prog.pollitoNacio;
+  const visible = vistaActiva && prog.pollitoNacio;
   companero.hidden = !visible;
   if (!visible) return;
 
@@ -838,12 +1030,25 @@ function acompanarEstudio(fraseInicial) {
   indiceFraseCompanero = 0;
   repasoTerminado = location.hash === "#/repaso" && repasoCelebrado;
   mostrarCompanero(fraseInicial || "¡Aquí estoy para acompañarte! Tú puedes. 💛");
-  temporizadorCompanero = setInterval(() => {
-    if (document.hidden || repasoTerminado) return;
-    mostrarCompanero(FRASES_COMPANERO[indiceFraseCompanero % FRASES_COMPANERO.length]);
-    indiceFraseCompanero++;
-  }, 15000);
+  function programarMensaje() {
+    temporizadorCompanero = setTimeout(() => {
+      $("pollito-companero-mensaje").hidden = true;
+      if (repasoTerminado) return;
+      temporizadorCompanero = setTimeout(() => {
+        if (!document.hidden) {
+          mostrarCompanero(FRASES_COMPANERO[indiceFraseCompanero % FRASES_COMPANERO.length]);
+          indiceFraseCompanero++;
+        }
+        programarMensaje();
+      }, 15000);
+    }, 15000);
+  }
+  programarMensaje();
 }
+
+$("pollito-companero").addEventListener("click", () => {
+  mostrarCompanero(pick(FRASES_COMPANERO));
+});
 
 document.addEventListener("pointerdown", programarMensajeInactividad, { passive: true });
 document.addEventListener("keydown", programarMensajeInactividad);
@@ -853,17 +1058,19 @@ document.addEventListener("visibilitychange", () => {
 });
 
 function pintarInicio() {
+  detenerDialogoMascota();
+  limpiarDialogoMascota = iniciarDialogoCiclico($("mascota-mensaje"), [...SALUDOS_MASCOTA, ...FRASES, ...FRASES_COMPANERO]);
   const n = modulo.subtemas.length, hechos = modulo.subtemas.map((_, t) => temaCompleto(t)), v = hechos.filter(Boolean).length;
   const abierto = repasoDesbloqueado();
-  document.querySelectorAll("#lista li:not(.repaso)").forEach((li, i) => li.classList.toggle("visto", hechos[i]));
+  document.querySelectorAll("#lista li:not(.repaso):not(.juegos)").forEach((li, i) => li.classList.toggle("visto", hechos[i]));
 
   // El botón de Repaso está bloqueado hasta completar todos los temas
   const li = document.querySelector("#lista li.repaso"), enlace = li.querySelector("a");
   li.classList.toggle("bloqueado", !abierto);
   enlace.setAttribute("aria-disabled", String(!abierto));
   li.querySelector(".num").textContent = abierto ? "★" : "🔒";
-  li.querySelector(".nombre").textContent = abierto ? "Repaso: ¡pon a prueba lo aprendido!"
-    : `Repaso: se desbloquea al completar los ${n} temas (llevas ${v})`;
+  li.querySelector(".nombre").textContent = abierto ? "Hoja de ejercicios: ¡pon a prueba lo aprendido!"
+    : `Hoja de ejercicios: se desbloquea al completar los ${n} temas (llevas ${v})`;
   if (abierto && !prog.repasoAvisado) {        // primera vez que se desbloquea: celebración
     prog.repasoAvisado = true;
     guardarProg();
@@ -894,7 +1101,7 @@ $("lista").addEventListener("click", (e) => {   // si está bloqueado, no entra:
 function htmlPractica(t) {
   return `<section class="caja caja-practica" data-tema="${t}">
     <h3 class="caja-titulo">Practica: completa los 3 ejercicios<span class="hint" data-estado></span></h3>
-    <p class="practica-nota">Al completar los 3 ejercicios se llena tu barra de progreso. La solución se desbloquea cuando termines.</p>
+    <p class="practica-nota">Al completar los 3 ejercicios completas el tema y avanzas hacia el desbloqueo de la hoja de ejercicios. La solución se desbloquea cuando termines.</p>
     ${ejerciciosFijos(t).map((ej, n) => htmlEjercicio(ej, `f${t}_${n}`, n, "", `${t}_${n}`)).join("")}
   </section>`;
 }
@@ -950,16 +1157,17 @@ function actualizarMarcador() {
   const total = arts.length, ok = document.querySelectorAll("#repaso-contenido .ejercicio[data-ok]").length;
   if (!total) return;
   const completo = ok === total;
-  $("marc-texto").textContent = completo ? "🏆 ¡Repaso completo! Ya puedes ver todas las soluciones."
+  $("marc-texto").textContent = completo ? (repasoCalificada ? "🏆 ¡Repaso completo! Ya puedes ver todas las soluciones." : "🏆 ¡Todas correctas! Califica la hoja para ver las soluciones.")
     : ok === 0 ? "¡Tú puedes! Resuelve el primero." : `${ok} de ${total} correctos · ¡sigue así!`;
   $("marc-barra").style.width = (ok / total * 100) + "%";
-  arts.forEach((a) => {                 // la solución solo aparece al terminar todos
+  arts.forEach((a) => {
     const caja = a.querySelector(".ej-solucion");
-    if (completo) { if (!caja.querySelector("details")) caja.innerHTML = htmlSolucion(ejerciciosActivos[a.dataset.id]); }
-    else caja.innerHTML = htmlBloqueo(`La solución se verá cuando termines todos los ejercicios (llevas ${ok} de ${total}).`);
+    if (repasoCalificada) {
+      if (!caja.querySelector("details")) caja.innerHTML = htmlSolucion(ejerciciosActivos[a.dataset.id]);
+    } else caja.innerHTML = htmlBloqueo("Califica la hoja para ver esta solución.");
   });
-  if (completo && !repasoCelebrado) { repasoCelebrado = true; confeti($("marcador"), 80); }
-  if (completo && !repasoTerminado) {
+  if (repasoCalificada && completo && !repasoCelebrado) { repasoCelebrado = true; confeti($("marcador"), 80); }
+  if (repasoCalificada && completo && !repasoTerminado) {
     repasoTerminado = true;
     mostrarCompanero("¡Terminaste todo el repaso! Gracias por estudiar conmigo. ¡Estoy muy orgulloso de ti! 🎉🐣");
     confeti($("pollito-companero"), 60);
@@ -968,7 +1176,20 @@ function actualizarMarcador() {
 
 // Mostrar la vista según la dirección (#/ o #/3)
 function mostrar() {
+  detenerDialogoMascota();
   actualizarMascota();
+  if (location.hash === "#/juegos") {
+    vistaIndice.hidden = true;
+    vistaDetalle.hidden = true;
+    vistaRepaso.hidden = true;
+    vistaJuegos.hidden = false;
+    $("pollito-companero").hidden = true;
+    clearTimeout(temporizadorCompanero);
+    document.title = "Juegos · " + modulo.titulo;
+    window.scrollTo(0, 0);
+    return;
+  }
+  vistaJuegos.hidden = true;
   if (location.hash === "#/repaso" && !repasoDesbloqueado()) {   // bloqueado: vuelve al inicio
     history.replaceState(null, "", "#/");
     mostrar();
@@ -995,7 +1216,7 @@ function mostrar() {
     vistaDetalle.hidden = true;
     vistaIndice.hidden = false;
     $("pollito-companero").hidden = true;
-    clearInterval(temporizadorCompanero);
+    clearTimeout(temporizadorCompanero);
     document.title = modulo.titulo;
     pintarInicio();
     return;
@@ -1084,10 +1305,7 @@ mostrar();
 
 
 /* ============================================================
-   IDEAS · un mini-juego distinto en cada subtema
-   Se "engancha" solo: cuando abres un subtema, agrega una caja
-   "Juega y descubre" después de "Cómo funciona y cómo se aplica".
-   El orden de JUEGOS coincide con los subtemas 1.1, 1.2, 1.3...
+   Minijuegos educativos disponibles desde la sección Juegos.
    ============================================================ */
 (function () {
   "use strict";
@@ -1120,240 +1338,732 @@ mostrar();
 
   /* ---------- 1.1 LA CAJA FUERTE ---------- */
   function juego11(b) {
-    const cuenta = (o, r) =>
-      o && r ? [10000, "10 × 10 × 10 × 10 = 10,000: cada posición tiene 10 opciones."]
-      : o ? [5040, "10 × 9 × 8 × 7 = 5,040: cada dígito usado ya no vuelve."]
-      : r ? [715, "Sin orden y con repetición: 715. ¡1123 y 3211 ya cuentan como la misma!"]
-      : [210, "Sin orden y sin repetición: 210. Solo importa qué dígitos son."];
+    const totalCodigos = 5;
+    const preguntasUsadas = new Set();
     b.innerHTML = `
-      <p class="jg-intro">Caja fuerte de <strong>4 dígitos</strong> (0–9). Mueve los interruptores y mira cuántas claves hay.</p>
-      <div class="jg-fila">
-        <label class="jg-sw"><input type="checkbox" class="o" checked><i></i>¿Importa el orden?</label>
-        <label class="jg-sw"><input type="checkbox" class="r" checked><i></i>¿Se puede repetir?</label>
+      <p class="jg-intro">Resuelve <strong>5 códigos</strong> distintos para abrir la caja fuerte. Cada acierto enciende una casilla; si fallas, el candado se reinicia con nuevos retos.</p>
+      <div class="jg-casillas" role="group" aria-label="Progreso de los cinco códigos">
+        ${Array.from({ length: totalCodigos }, (_, i) => `<span class="jg-casilla" aria-label="Código ${i + 1} pendiente">🔒</span>`).join("")}
       </div>
-      <div class="jg-gran"><span class="num">0</span><small><span class="cerr">🔐</span> claves posibles</small></div>
-      <p class="jg-nota"></p>
-      <div class="jg-resp"><input class="pin" inputmode="numeric" maxlength="4" placeholder="PIN de 4 dígitos" aria-label="Prueba un PIN"><button type="button" class="jg-btn">Probar 🔓</button></div>
-      <p class="jg-msg" role="status"></p>`;
-    const o = b.querySelector(".o"), r = b.querySelector(".r"), num = b.querySelector(".num"), gran = b.querySelector(".jg-gran"),
-      cerr = b.querySelector(".cerr"), nota = b.querySelector(".jg-nota"), pin = b.querySelector(".pin"), msg = b.querySelector(".jg-msg");
-    const act = () => {
-      const [n, t] = cuenta(o.checked, r.checked); contar(num, n); nota.textContent = t; msg.textContent = "";
-      gran.classList.remove("abierta"); cerr.textContent = "🔐"; anima(gran, "bump");
-    };
-    o.addEventListener("change", act); r.addEventListener("change", act); act();
-    pin.addEventListener("input", () => { pin.value = pin.value.replace(/\D/g, ""); });
-    const probar = () => {
-      const p = pin.value;
-      msg.className = "jg-msg";
-      if (p.length !== 4) { msg.textContent = "Escribe 4 dígitos."; return; }
-      const veces = {}; for (const d of p) veces[d] = (veces[d] || 0) + 1;
-      if (!r.checked && Object.values(veces).some((v) => v > 1)) {
-        msg.classList.add("jg-mal"); msg.textContent = "🚫 La caja la rechaza: tiene dígitos repetidos.";
-        anima(gran, "sacude"); return;
+      <p class="jg-codigo-progreso" aria-live="polite"></p>
+      <section class="jg-reto-codigo">
+        <p class="jg-codigo-pregunta"></p>
+        <div class="jg-resp"><input class="jg-codigo-respuesta" autocomplete="off" aria-label="Respuesta del código"><button type="button" class="jg-btn">Probar código 🔑</button></div>
+      </section>
+      <p class="jg-msg jg-codigo-mensaje" role="status" aria-live="polite"></p>
+      <button type="button" class="jg-btn jg-codigo-reiniciar" hidden>Jugar otra vez 🔄</button>`;
+    const casillas = [...b.querySelectorAll(".jg-casilla")];
+    const progreso = b.querySelector(".jg-codigo-progreso");
+    const reto = b.querySelector(".jg-reto-codigo");
+    const pregunta = b.querySelector(".jg-codigo-pregunta");
+    const respuesta = b.querySelector(".jg-codigo-respuesta");
+    const boton = b.querySelector(".jg-resp .jg-btn");
+    const mensaje = b.querySelector(".jg-codigo-mensaje");
+    const reiniciar = b.querySelector(".jg-codigo-reiniciar");
+    let ronda = [];
+    let indice = 0;
+
+    function preguntaAleatoria(excluidas) {
+      for (let intento = 0; intento < 1000; intento++) {
+        const tema = R(0, GEN.length - 1);
+        const ejercicio = GEN[tema][R(0, GEN[tema].length - 1)]();
+        const firma = `${tema}-${ejercicio.firma}`;
+        if (!preguntasUsadas.has(firma) && !excluidas.has(firma)) {
+          excluidas.add(firma);
+          return { firma, ejercicio };
+        }
       }
-      msg.classList.add("jg-ok");
-      if (!o.checked) {
-        const orden = fa(4) / Object.values(veces).reduce((x, v) => x * fa(v), 1);
-        msg.textContent = `✅ ¡Abierta! Sin importar el orden, esos dígitos abren la caja de ${orden} formas.`;
-      } else msg.textContent = "✅ ¡Abierta! Con orden, mover un solo dígito ya sería otra clave.";
-      cerr.textContent = "🔓"; gran.classList.add("abierta");
-      setTimeout(() => { if (vivo(gran)) { gran.classList.remove("abierta"); cerr.textContent = "🔐"; } }, 2200);
-      fiesta(gran, 24);
-    };
-    b.querySelector(".jg-btn").addEventListener("click", probar);
-    pin.addEventListener("keydown", (e) => { if (e.key === "Enter") probar(); });
+      return null;
+    }
+
+    function nuevaRonda() {
+      const firmasRonda = new Set();
+      ronda = [];
+      while (ronda.length < totalCodigos) {
+        const siguiente = preguntaAleatoria(firmasRonda);
+        if (!siguiente) {
+          preguntasUsadas.clear();
+          firmasRonda.clear();
+          ronda = [];
+          continue;
+        }
+        ronda.push(siguiente);
+      }
+      ronda.forEach((retoNuevo) => preguntasUsadas.add(retoNuevo.firma));
+      indice = 0;
+      casillas.forEach((casilla, i) => {
+        casilla.classList.remove("encendida");
+        casilla.textContent = "🔒";
+        casilla.setAttribute("aria-label", `Código ${i + 1} pendiente`);
+      });
+      reto.hidden = false;
+      reiniciar.hidden = true;
+      boton.disabled = false;
+      mostrarPregunta();
+    }
+
+    function mostrarPregunta() {
+      const actual = ronda[indice];
+      pregunta.innerHTML = actual.ejercicio.enunciado;
+      respuesta.value = "";
+      respuesta.placeholder = actual.ejercicio.ph || "Escribe tu respuesta";
+      respuesta.disabled = false;
+      progreso.textContent = `Código ${indice + 1} de ${totalCodigos}`;
+      mensaje.textContent = "";
+      mensaje.className = "jg-msg jg-codigo-mensaje";
+      respuesta.focus();
+    }
+
+    function comprobar() {
+      const actual = ronda[indice];
+      const valor = normaliza(respuesta.value);
+      if (!valor) {
+        mensaje.textContent = "Escribe la respuesta para probar este código.";
+        mensaje.className = "jg-msg jg-codigo-mensaje jg-mal";
+        return;
+      }
+      const correcta = normaliza(actual.ejercicio.respuesta);
+      if (valor !== correcta && !(actual.ejercicio.contiene && valor.includes(correcta))) {
+        mensaje.textContent = "Código incorrecto. El candado vuelve al inicio y genera cinco retos nuevos.";
+        mensaje.className = "jg-msg jg-codigo-mensaje jg-mal";
+        anima(reto, "sacude");
+        respuesta.disabled = true;
+        boton.disabled = true;
+        setTimeout(() => { if (vivo(reto)) nuevaRonda(); }, ms(1100));
+        return;
+      }
+
+      casillas[indice].classList.add("encendida");
+      casillas[indice].textContent = "🔓";
+      casillas[indice].setAttribute("aria-label", `Código ${indice + 1} correcto`);
+      fiesta(casillas[indice], 14);
+      indice++;
+      if (indice < totalCodigos) {
+        mostrarPregunta();
+        return;
+      }
+
+      reto.hidden = true;
+      progreso.textContent = "¡Los cinco códigos correctos! 🔓";
+      mensaje.textContent = "¡Felicidades, jugador! ¡Eres el mejor! 🎉";
+      mensaje.className = "jg-msg jg-codigo-mensaje jg-ok jg-codigo-victoria";
+      reiniciar.hidden = false;
+      fiesta(b.querySelector(".jg-casillas"), 90);
+    }
+
+    boton.addEventListener("click", comprobar);
+    respuesta.addEventListener("keydown", (e) => { if (e.key === "Enter") comprobar(); });
+    reiniciar.addEventListener("click", nuevaRonda);
+    nuevaRonda();
   }
 
   /* ---------- 1.2 DOMINÓ EN CADENA ---------- */
   function juego12(b) {
     b.innerHTML = `
-      <p class="jg-intro">Elige cuántas fichas y empuja la primera: cada una arrastra a la siguiente.</p>
-      <label class="jg-rango">n = <strong class="n">5</strong><input type="range" min="1" max="10" value="5" aria-label="Valor de n"></label>
+      <p class="jg-intro">¡Reto de dominó! Resuelve cinco misiones factoriales. Adivina cuántas formas hay y luego empuja la fila para ver cómo cae el cálculo.</p>
+      <p class="jg-reto-progreso"></p>
+      <div class="jg-reto-barra" role="progressbar" aria-label="Misiones resueltas" aria-valuemin="0" aria-valuemax="5" aria-valuenow="0"><span></span></div>
+      <p class="jg-reto-pregunta"></p>
+      <label class="jg-rango">Fichas: <strong class="n"></strong></label>
       <div class="jg-domino"></div>
       <p class="jg-calc"></p>
-      <div class="jg-centro"><button type="button" class="jg-btn">Empujar ▶</button></div>`;
-    const rango = b.querySelector("input"), nEl = b.querySelector(".n"), fila = b.querySelector(".jg-domino"),
-      calc = b.querySelector(".jg-calc"), btn = b.querySelector(".jg-btn");
-    let corriendo = false;
-    const dibujar = () => {
-      const n = +rango.value; nEl.textContent = n;
-      fila.innerHTML = Array.from({ length: n }, (_, i) => `<span class="jg-ficha" style="--k:${i}">${n - i}</span>`).join("");
-      calc.textContent = `Toca «Empujar» para armar ${n}!`;
-    };
-    rango.addEventListener("input", () => { if (!corriendo) dibujar(); });
-    btn.addEventListener("click", () => {
+      <div class="jg-reto-respuesta"><input class="jg-respuesta-factorial" inputmode="numeric" placeholder="¿Cuántas formas?" aria-label="Respuesta del factorial"><button type="button" class="jg-btn jg-comprobar-factorial">Comprobar y empujar 🎲</button></div>
+      <p class="jg-msg jg-factorial-mensaje" role="status" aria-live="polite"></p>
+      <button type="button" class="jg-btn jg-factorial-siguiente" hidden>Siguiente misión →</button>
+      <button type="button" class="jg-btn jg-factorial-reiniciar" hidden>Otra partida 🔄</button>`;
+    const nEl = b.querySelector(".n"), fila = b.querySelector(".jg-domino");
+    const calc = b.querySelector(".jg-calc"), pregunta = b.querySelector(".jg-reto-pregunta");
+    const progreso = b.querySelector(".jg-reto-progreso"), barra = b.querySelector(".jg-reto-barra");
+    const entrada = b.querySelector(".jg-respuesta-factorial"), comprobar = b.querySelector(".jg-comprobar-factorial");
+    const mensaje = b.querySelector(".jg-factorial-mensaje"), siguiente = b.querySelector(".jg-factorial-siguiente");
+    const reiniciar = b.querySelector(".jg-factorial-reiniciar");
+    const misiones = [
+      { n: 3, texto: "🎮 Tres personajes deben probar una misión, uno después de otro. ¿Cuántos órdenes posibles hay?" },
+      { n: 4, texto: "🍕 Cuatro ingredientes se agregan a una pizza en fila. ¿De cuántas maneras se pueden ordenar?" },
+      { n: 5, texto: "🏁 Cinco corredores cruzan la meta y se registra todo el orden de llegada. ¿Cuántas filas posibles hay?" },
+      { n: 6, texto: "🧩 Seis piezas distintas deben colocarse en una línea para resolver un acertijo. ¿Cuántos órdenes hay?" },
+      { n: 7, texto: "🚀 Siete tareas del lanzamiento se ejecutan todas en una secuencia. ¿Cuántas secuencias distintas pueden hacerse?" },
+    ];
+    let mazo = [], ronda = 0, corriendo = false;
+
+    function prepararPartida() {
+      mazo = mezclar(misiones);
+      ronda = 0;
+      siguiente.hidden = true;
+      reiniciar.hidden = true;
+      mostrarMision();
+    }
+    function mostrarMision() {
+      if (ronda >= mazo.length) {
+        pregunta.textContent = "¡Misión completa! Ya dominas los factoriales. 🏆";
+        nEl.textContent = "🎉";
+        fila.replaceChildren();
+        calc.textContent = "Cinco filas de dominó derribadas. ¡Eres una leyenda del conteo!";
+        entrada.hidden = true;
+        comprobar.hidden = true;
+        siguiente.hidden = true;
+        reiniciar.hidden = false;
+        progreso.textContent = "5 de 5 misiones";
+        barra.setAttribute("aria-valuenow", "5");
+        barra.querySelector("span").style.width = "100%";
+        fiesta(calc, 80);
+        return;
+      }
+      const mision = mazo[ronda];
+      nEl.textContent = mision.n;
+      pregunta.textContent = mision.texto;
+      fila.innerHTML = Array.from({ length: mision.n }, (_, i) => `<span class="jg-ficha" style="--k:${i}">${mision.n - i}</span>`).join("");
+      calc.textContent = "Cada ficha es un factor. Escribe el resultado y empuja la primera.";
+      entrada.value = "";
+      entrada.disabled = false;
+      entrada.hidden = false;
+      comprobar.disabled = false;
+      comprobar.hidden = false;
+      siguiente.hidden = true;
+      mensaje.textContent = "";
+      progreso.textContent = `Misión ${ronda + 1} de ${misiones.length}`;
+      barra.setAttribute("aria-valuenow", String(ronda));
+      barra.querySelector("span").style.width = `${ronda / misiones.length * 100}%`;
+    }
+    function empujar() {
       if (corriendo) return;
-      dibujar();
-      const n = +rango.value, fichas = [...fila.children];
-      corriendo = true; btn.disabled = true; rango.disabled = true;
-      let prod = 1;
-      fichas.forEach((f, i) => setTimeout(() => {
-        if (!vivo(f)) return;
-        f.classList.add("cae"); prod *= n - i;
-        calc.textContent = Array.from({ length: i + 1 }, (_, k) => n - k).join(" × ") + " = " + fm(prod);
+      corriendo = true;
+      comprobar.disabled = true;
+      entrada.disabled = true;
+      const n = mazo[ronda].n, fichas = [...fila.children];
+      let producto = 1;
+      fichas.forEach((ficha, i) => setTimeout(() => {
+        if (!vivo(ficha)) return;
+        ficha.classList.add("cae");
+        producto *= n - i;
+        calc.textContent = `${Array.from({ length: i + 1 }, (_, k) => n - k).join(" × ")} = ${fm(producto)}`;
         anima(calc, "bump");
         if (i === n - 1) {
-          corriendo = false; btn.disabled = false; rango.disabled = false;
-          calc.innerHTML = `${n}! = ${fm(fa(n))}` + (n > 1 ? `<br><small>= ${n} × ${n - 1}! = ${n} × ${fm(fa(n - 1))}</small>` : "") +
-            (n === 10 ? "<br><small>¡Con solo 10 fichas ya pasas de 3 millones! 🚀</small>" : "");
-          anima(calc, "bump"); fiesta(calc, 24);
+          corriendo = false;
+          calc.innerHTML = `${n}! = ${fm(fa(n))}<br><small>${Array.from({ length: n }, (_, k) => n - k).join(" × ")} = ${fm(fa(n))}</small>`;
+          mensaje.textContent = `¡Correcto! Derribaste ${n} fichas y hay ${fm(fa(n))} órdenes posibles.`;
+          mensaje.className = "jg-msg jg-ok";
+          ronda++;
+          barra.setAttribute("aria-valuenow", String(ronda));
+          barra.querySelector("span").style.width = `${ronda / misiones.length * 100}%`;
+          fiesta(calc, 24);
+          if (ronda < misiones.length) siguiente.hidden = false;
+          else setTimeout(mostrarMision, ms(1300));
         }
-      }, ms(i * 380)));
+      }, ms(i * 260)));
+    }
+    comprobar.addEventListener("click", () => {
+      if (corriendo || comprobar.disabled) return;
+      if (!entrada.value.trim()) {
+        mensaje.textContent = "Escribe el número de formas antes de empujar el dominó.";
+        mensaje.className = "jg-msg jg-mal";
+        return;
+      }
+      const esperado = fa(mazo[ronda].n);
+      if (Number(normaliza(entrada.value)) !== esperado) {
+        mensaje.textContent = "¡Casi! Recuerda: multiplica n × (n−1) × … × 1. Intenta otra vez.";
+        mensaje.className = "jg-msg jg-mal";
+        anima(fila, "sacude");
+        return;
+      }
+      empujar();
     });
-    dibujar();
+    entrada.addEventListener("keydown", (e) => { if (e.key === "Enter") comprobar.click(); });
+    siguiente.addEventListener("click", mostrarMision);
+    reiniciar.addEventListener("click", prepararPartida);
+    prepararPartida();
   }
 
   /* ---------- 1.3 EL MONSTRUO COME-FACTORIALES ---------- */
   function juego13(b) {
-    let a, bb, exp, sel, hecho, timer;
+    const vidasMaximas = 5;
+    const problemasMaximos = 5;
+    const claveBloqueo = "monstruo_cooldown_hasta";
+    const problemasUsados = new Set();
+    let problemas = [];
+    let vidas = vidasMaximas;
+    let indice = 0;
+    let reloj;
+    let bloqueoHasta = 0;
+
     b.innerHTML = `
-      <p class="jg-intro">El monstruo solo come <strong>factoriales iguales</strong> (uno arriba y uno abajo). Expande y tócalos.</p>
-      <div class="jg-monstruo" aria-hidden="true">👾</div>
-      <p class="jg-msg" role="status"></p>
-      <div class="jg-frac">
-        <div class="jg-fila-f arriba"></div><div class="jg-linea"></div><div class="jg-fila-f abajo"></div>
-      </div>
-      <div class="jg-fila" style="justify-content:center"><button type="button" class="jg-btn exp">Expandir</button><button type="button" class="jg-btn nuevo">Otra fracción 🔄</button></div>`;
-    const arriba = b.querySelector(".arriba"), abajo = b.querySelector(".abajo"), msg = b.querySelector(".jg-msg"),
-      mon = b.querySelector(".jg-monstruo"), bExp = b.querySelector(".exp");
-    const decir = (t, cls) => { msg.className = "jg-msg " + (cls || ""); msg.textContent = t; };
-    const cara = (e, clase) => {
-      mon.textContent = e; mon.classList.remove("sacude", "come"); void mon.offsetWidth; if (!reducido) mon.classList.add(clase);
-      clearTimeout(timer); timer = setTimeout(() => { if (vivo(mon)) { mon.textContent = "👾"; mon.classList.remove("sacude", "come"); } }, 1400);
-    };
-    const escupe = (t) => { decir(t, "jg-mal"); cara("🤢", "sacude"); };
-    function nuevo() {
-      bb = R(3, 7); a = bb + R(2, 3); exp = false; sel = null; hecho = false;
-      arriba.innerHTML = `<button type="button" class="jg-chip fact" data-t="f" data-l="a">${a}!</button>`;
-      abajo.innerHTML = `<button type="button" class="jg-chip fact" data-t="f" data-l="b">${bb}!</button>`;
-      bExp.disabled = false; bExp.textContent = `Expandir ${a}!`; mon.textContent = "👾";
-      decir(`Tengo hambre 😋 Expande ${a}! para encontrar un ${bb}! escondido.`);
+      <p class="jg-intro">Alimenta al monstruo simplificando cinco fracciones factoriales. Escribe los factores que quedan y su producto. Tienes cinco vidas.</p>
+      <div class="jg-monstruo monstruo-quiz" aria-hidden="true">👾</div>
+      <div class="monstruo-vidas" role="status" aria-live="polite" aria-label="Vidas restantes"></div>
+      <p class="monstruo-ronda"></p>
+      <section class="monstruo-problema">
+        <p class="monstruo-formula"></p>
+        <label class="monstruo-etiqueta">Factores que quedan (usa × o x)
+          <input class="monstruo-factores" autocomplete="off" placeholder="Ejemplo: 8 × 7 × 6" aria-label="Factores restantes">
+        </label>
+        <label class="monstruo-etiqueta">Producto de esos factores
+          <input class="monstruo-producto" inputmode="numeric" autocomplete="off" placeholder="Escribe el resultado" aria-label="Producto de los factores">
+        </label>
+        <button type="button" class="jg-btn monstruo-comprobar">Darle de comer 🍽️</button>
+      </section>
+      <p class="jg-msg monstruo-mensaje" role="status" aria-live="polite"></p>
+      <p class="monstruo-temporizador" role="status" aria-live="polite" hidden></p>
+      <div class="jg-fila monstruo-acciones">
+        <button type="button" class="jg-btn monstruo-empezar">Empezar reto 👾</button>
+        <button type="button" class="jg-btn monstruo-siguiente" hidden>Siguiente problema →</button>
+        <button type="button" class="jg-btn monstruo-reintentar" hidden>Jugar otra vez 🔄</button>
+      </div>`;
+
+    const monstruo = b.querySelector(".monstruo-quiz");
+    const vidasEl = b.querySelector(".monstruo-vidas");
+    const rondaEl = b.querySelector(".monstruo-ronda");
+    const problemaEl = b.querySelector(".monstruo-problema");
+    const formula = b.querySelector(".monstruo-formula");
+    const factores = b.querySelector(".monstruo-factores");
+    const producto = b.querySelector(".monstruo-producto");
+    const comprobar = b.querySelector(".monstruo-comprobar");
+    const mensaje = b.querySelector(".monstruo-mensaje");
+    const temporizadorEl = b.querySelector(".monstruo-temporizador");
+    const empezar = b.querySelector(".monstruo-empezar");
+    const siguiente = b.querySelector(".monstruo-siguiente");
+    const reintentar = b.querySelector(".monstruo-reintentar");
+
+    function pintarVidas() {
+      vidasEl.textContent = `${"❤️".repeat(vidas)}${"🖤".repeat(vidasMaximas - vidas)}  ${vidas} de ${vidasMaximas} vidas`;
     }
-    bExp.addEventListener("click", () => {
-      if (exp || hecho) return;
-      exp = true; bExp.disabled = true; sel = null;
-      const n = a - bb;
-      arriba.innerHTML = Array.from({ length: n }, (_, i) => `<button type="button" class="jg-chip num" data-t="n" data-l="a" style="--k:${i}">${a - i}</button>`).join("<span>×</span>") +
-        `<span>×</span><button type="button" class="jg-chip fact" data-t="f" data-l="a" style="--k:${n}">${bb}!</button>`;
-      decir(`${a}! = ${Array.from({ length: n }, (_, i) => a - i).join(" × ")} × ${bb}!  ¿Ves el ${bb}! escondido? Tócalo arriba y abajo.`);
-    });
-    b.querySelector(".nuevo").addEventListener("click", nuevo);
-    b.addEventListener("click", (e) => {
-      const c = e.target.closest(".jg-chip[data-t]");
-      if (!c || hecho) return;
-      if (!sel) { sel = c; c.classList.add("sel"); return; }
-      if (sel === c) { c.classList.remove("sel"); sel = null; return; }
-      const par = [sel, c]; sel.classList.remove("sel"); sel = null;
-      const dosF = par.every((x) => x.dataset.t === "f"), lados = par[0].dataset.l !== par[1].dataset.l;
-      if (dosF && lados) {
-        if (!exp) return escupe(`${a}! y ${bb}! no son iguales todavía. Primero expande ${a}!.`);
-        par.forEach((x) => x.classList.add("comido")); hecho = true;
-        const nums = Array.from({ length: a - bb }, (_, i) => a - i), p = nums.reduce((x, y) => x * y, 1);
-        decir(`😋 ¡Ñam! Quedó ${nums.join(" × ")} = ${fm(p)}.`, "jg-ok");
-        cara("😋", "come"); fiesta(mon, 24);
-      } else if (dosF) escupe("Esos dos están del mismo lado: no se cancelan entre sí.");
-      else escupe("¡Puaj! Un factorial solo se cancela con otro factorial igual, no con un número suelto (4! ≠ 4).");
-    });
-    nuevo();
+
+    function crearProblemas() {
+      problemas = [];
+      const todos = [];
+      for (let denominador = 3; denominador <= 9; denominador++) {
+        for (let cantidadFactores = 2; cantidadFactores <= 4; cantidadFactores++) {
+          const numerador = denominador + cantidadFactores;
+          const firma = `${numerador}/${denominador}`;
+          todos.push({ denominador, numerador, firma, cantidadFactores });
+        }
+      }
+      let disponibles = todos.filter((problema) => !problemasUsados.has(problema.firma));
+      if (disponibles.length < problemasMaximos) {
+        problemasUsados.clear();
+        disponibles = todos;
+      }
+      const candidatos = barajar(disponibles);
+      while (problemas.length < problemasMaximos) {
+        const elegido = candidatos.pop();
+        const { denominador, numerador, firma, cantidadFactores } = elegido;
+        problemasUsados.add(firma);
+        const listaFactores = Array.from({ length: cantidadFactores }, (_, i) => numerador - i);
+        problemas.push({
+          numerador,
+          denominador,
+          listaFactores,
+          resultado: listaFactores.reduce((total, valor) => total * valor, 1),
+        });
+      }
+    }
+
+    function mostrarProblema() {
+      const actual = problemas[indice];
+      rondaEl.textContent = `Problema ${indice + 1} de ${problemasMaximos}`;
+      formula.innerHTML = mate(`{${actual.numerador}!}/{${actual.denominador}!}`);
+      factores.value = "";
+      producto.value = "";
+      mensaje.textContent = "";
+      mensaje.className = "jg-msg monstruo-mensaje";
+      siguiente.hidden = true;
+      problemaEl.hidden = false;
+      factores.disabled = false;
+      producto.disabled = false;
+      comprobar.disabled = false;
+      factores.focus();
+    }
+
+    function iniciarReto() {
+      clearInterval(reloj);
+      vidas = vidasMaximas;
+      indice = 0;
+      crearProblemas();
+      pintarVidas();
+      empezar.hidden = true;
+      reintentar.hidden = true;
+      temporizadorEl.hidden = true;
+      monstruo.textContent = "👾";
+      mostrarProblema();
+    }
+
+    function formatoTiempo(msRestante) {
+      const segundos = Math.max(0, Math.ceil(msRestante / 1000));
+      const minutos = Math.floor(segundos / 60);
+      return `${minutos}:${String(segundos % 60).padStart(2, "0")}`;
+    }
+
+    function actualizarBloqueo() {
+      const restante = bloqueoHasta - Date.now();
+      if (restante <= 0) {
+        clearInterval(reloj);
+        reloj = null;
+        bloqueoHasta = 0;
+        try { localStorage.removeItem(claveBloqueo); } catch (e) {}
+        vidas = vidasMaximas;
+        pintarVidas();
+        temporizadorEl.hidden = true;
+        mensaje.textContent = "¡Ya puedes volver a jugar! El monstruo tiene hambre. 👾";
+        mensaje.className = "jg-msg monstruo-mensaje jg-ok";
+        empezar.hidden = false;
+        return;
+      }
+      problemaEl.hidden = true;
+      empezar.hidden = true;
+      temporizadorEl.hidden = false;
+      temporizadorEl.textContent = `El monstruo necesita descansar. Podrás jugar otra vez en ${formatoTiempo(restante)}.`;
+    }
+
+    function activarBloqueo() {
+      bloqueoHasta = Date.now() + 5 * 60 * 1000;
+      try { localStorage.setItem(claveBloqueo, String(bloqueoHasta)); } catch (e) {}
+      mensaje.textContent = "¡Se acabaron las vidas! El monstruo se queda con hambre por ahora.";
+      mensaje.className = "jg-msg monstruo-mensaje jg-mal";
+      monstruo.textContent = "😴";
+      siguiente.hidden = true;
+      reintentar.hidden = true;
+      actualizarBloqueo();
+      reloj = setInterval(actualizarBloqueo, 1000);
+    }
+
+    function comprobarRespuesta() {
+      const actual = problemas[indice];
+      const factoresUsuario = normaliza(factores.value).replace(/×/g, "x");
+      const factoresCorrectos = actual.listaFactores.join("x");
+      const productoUsuario = normaliza(producto.value);
+      if (!factoresUsuario || !productoUsuario) {
+        mensaje.textContent = "Completa los factores y el producto para alimentar al monstruo.";
+        mensaje.className = "jg-msg monstruo-mensaje jg-mal";
+        return;
+      }
+
+      if (factoresUsuario !== factoresCorrectos || productoUsuario !== String(actual.resultado)) {
+        vidas--;
+        pintarVidas();
+        monstruo.textContent = "🤢";
+        anima(problemaEl, "sacude");
+        if (vidas === 0) {
+          activarBloqueo();
+        } else {
+          mensaje.textContent = `¡Puaj! No era eso. Te quedan ${vidas} ${vidas === 1 ? "vida" : "vidas"}; intenta otra vez este problema.`;
+          mensaje.className = "jg-msg monstruo-mensaje jg-mal";
+        }
+        return;
+      }
+
+      mensaje.textContent = `¡Ñam! ${actual.listaFactores.join(" × ")} = ${fm(actual.resultado)}. El monstruo recibió su alimento.`;
+      mensaje.className = "jg-msg monstruo-mensaje jg-ok";
+      monstruo.textContent = "😋";
+      anima(monstruo, "come");
+      fiesta(monstruo, 22);
+      factores.disabled = true;
+      producto.disabled = true;
+      comprobar.disabled = true;
+      indice++;
+      if (indice === problemasMaximos) {
+        problemaEl.hidden = true;
+        rondaEl.textContent = "¡Cinco problemas resueltos!";
+        mensaje.textContent = "¡El monstruo está satisfecho! ¡Completaste los cinco problemas! 🎉";
+        reintentar.hidden = false;
+        fiesta(monstruo, 90);
+      } else {
+        siguiente.hidden = false;
+      }
+    }
+
+    function cargarBloqueoGuardado() {
+      try { bloqueoHasta = Number(localStorage.getItem(claveBloqueo)) || 0; } catch (e) { bloqueoHasta = 0; }
+      pintarVidas();
+      if (bloqueoHasta > Date.now()) {
+        vidas = 0;
+        pintarVidas();
+        actualizarBloqueo();
+        reloj = setInterval(actualizarBloqueo, 1000);
+      } else {
+        bloqueoHasta = 0;
+        empezar.hidden = false;
+        problemaEl.hidden = true;
+      }
+    }
+
+    comprobar.addEventListener("click", comprobarRespuesta);
+    [factores, producto].forEach((campo) => campo.addEventListener("keydown", (e) => {
+      if (e.key === "Enter") comprobarRespuesta();
+    }));
+    empezar.addEventListener("click", iniciarReto);
+    siguiente.addEventListener("click", mostrarProblema);
+    reintentar.addEventListener("click", iniciarReto);
+    cargarBloqueoGuardado();
+    return () => clearInterval(reloj);
   }
 
   /* ---------- 1.4 ARMADOR DE HAMBURGUESAS ---------- */
   function juego14(b) {
-    const D = {
-      pan: ["🍞 Pan", ["Brioche", "Integral", "Sin gluten"]],
-      carne: ["🥩 Carne", ["Res", "Pollo", "Veggie"]],
+    const OPCIONES = {
+      pan: ["🍞 Pan", ["Brioche", "Integral", "Ajonjolí", "Papa", "Pretzel", "Sin gluten"]],
+      relleno: ["🍔 Relleno", ["Res", "Pollo", "Veggie", "Pescado", "Portobello", "Doble queso"]],
       salsa: ["🧴 Salsa", ["Ketchup", "Mostaza", "BBQ", "Ajo", "Picante", "Miel"]],
     };
-    const sel = { pan: 0, carne: 0, salsa: 0 };
-    let nSalsa = 3;
+    const misiones = [
+      { titulo: "🍔 Pedido de la feria", historia: "Prepara un combo para la feria. ¿Cuántas hamburguesas distintas puede ofrecer el puesto?", cantidades: [3, 2, 2] },
+      { titulo: "🎸 Festival de música", historia: "El food truck amplía el menú para el festival. ¿Cuántas hamburguesas distintas puede armar?", cantidades: [4, 3, 3] },
+      { titulo: "🏖️ Picnic en la playa", historia: "Un grupo quiere más opciones vegetarianas y salsas. Cuenta todas las hamburguesas posibles.", cantidades: [3, 4, 5] },
+      { titulo: "🚀 Banquete espacial", historia: "Los astronautas pueden elegir entre varias bases, rellenos y salsas. ¿Cuántos combos hay?", cantidades: [5, 3, 4] },
+      { titulo: "👑 Reto del chef", historia: "¡Menú gigante! Multiplica las opciones de cada fila para descubrir todas las hamburguesas posibles.", cantidades: [6, 5, 6] },
+    ];
+    let mazo = [];
+    let ronda = 0;
+    let seleccion = { pan: null, relleno: null, salsa: null };
+    let acertadas = 0;
     b.innerHTML = `
-      <p class="jg-intro">Elige <strong>una</strong> opción por fila y agrega salsas: mira cómo se dispara el total.</p>
+      <p class="jg-intro">¡Conviértete en chef combinatorio! Arma una hamburguesa, cuenta todas las opciones posibles y supera cinco pedidos cada vez más grandes.</p>
+      <p class="jg-reto-progreso"></p>
+      <div class="jg-reto-barra" role="progressbar" aria-label="Pedidos resueltos" aria-valuemin="0" aria-valuemax="5" aria-valuenow="0"><span></span></div>
+      <section class="jg-pedido">
+        <strong class="jg-pedido-titulo"></strong>
+        <p class="jg-pedido-historia"></p>
+        <p class="jg-pedido-datos"></p>
+      </section>
       <div class="filas"></div>
-      <div class="jg-fila"><button type="button" class="jg-btn mas">+ Salsa</button><button type="button" class="jg-btn menos">− Salsa</button><button type="button" class="jg-btn azar">🎲 Sorpréndeme</button></div>
       <div class="jg-burger" aria-live="polite"></div>
+      <label class="jg-burger-respuesta">¿Cuántas combinaciones hay?<input inputmode="numeric" placeholder="Escribe el total" aria-label="Total de hamburguesas posibles"></label>
+      <button type="button" class="jg-btn jg-burger-comprobar">Servir pedido 🍽️</button>
+      <p class="jg-msg jg-burger-mensaje" role="status" aria-live="polite"></p>
+      <button type="button" class="jg-btn jg-burger-siguiente" hidden>Siguiente pedido →</button>
+      <button type="button" class="jg-btn jg-burger-reiniciar" hidden>Abrir otro restaurante 🔄</button>
       <div class="jg-cuenta"></div>`;
-    const filas = b.querySelector(".filas"), burger = b.querySelector(".jg-burger"), cuenta = b.querySelector(".jg-cuenta");
-    function pintar(nuevoTotal) {
-      filas.innerHTML = Object.entries(D).map(([k, [tit, ops]]) => {
-        const n = k === "salsa" ? nSalsa : ops.length;
-        return `<div class="jg-menu-fila"><b>${tit}</b>${ops.slice(0, n).map((o, i) => `<button type="button" class="jg-chip" data-f="${k}" data-i="${i}" aria-pressed="${sel[k] === i}">${o}</button>`).join("")}</div>`;
-      }).join("");
-      burger.innerHTML = `<span style="--k:0">🍞</span><span style="--k:1">🧴</span><span style="--k:2">🥩</span><span style="--k:3">🍞</span><small>${D.pan[1][sel.pan]} · ${D.carne[1][sel.carne]} · ${D.salsa[1][sel.salsa]}</small>`;
-      const np = D.pan[1].length, nc = D.carne[1].length, tot = np * nc * nSalsa;
-      cuenta.innerHTML = `<span class="o">«o»</span> En cada fila eliges UNA (se suma): ${np} + ${nc} + ${nSalsa} = ${np + nc + nSalsa} ingredientes.<br>
-        <span class="y">«y»</span> Pero la hamburguesa lleva pan Y carne Y salsa (se multiplica): ${np} × ${nc} × ${nSalsa} = <strong>${tot}</strong> hamburguesas.`;
-      if (nuevoTotal) anima(cuenta, "bump");
-      b.querySelector(".mas").disabled = nSalsa >= 6;
-      b.querySelector(".menos").disabled = nSalsa <= 1;
+    const filas = b.querySelector(".filas");
+    const burger = b.querySelector(".jg-burger");
+    const cuenta = b.querySelector(".jg-cuenta");
+    const titulo = b.querySelector(".jg-pedido-titulo");
+    const historia = b.querySelector(".jg-pedido-historia");
+    const datos = b.querySelector(".jg-pedido-datos");
+    const progreso = b.querySelector(".jg-reto-progreso");
+    const barra = b.querySelector(".jg-reto-barra");
+    const entrada = b.querySelector(".jg-burger-respuesta input");
+    const mensaje = b.querySelector(".jg-burger-mensaje");
+    const comprobar = b.querySelector(".jg-burger-comprobar");
+    const siguiente = b.querySelector(".jg-burger-siguiente");
+    const reiniciar = b.querySelector(".jg-burger-reiniciar");
+
+    function prepararPartida() {
+      mazo = mezclar(misiones);
+      ronda = 0;
+      acertadas = 0;
+      reiniciar.hidden = true;
+      mostrarMision();
+    }
+    function mostrarMision() {
+      if (ronda === mazo.length) {
+        titulo.textContent = "🎉 ¡Restaurante de combinaciones completado!";
+        historia.textContent = "Superaste cinco pedidos y descubriste cómo «y» multiplica las opciones.";
+        datos.textContent = "";
+        filas.replaceChildren();
+        burger.innerHTML = "<span>🍔</span><span>👨‍🍳</span><small>¡Chef del conteo!</small>";
+        entrada.hidden = true;
+        comprobar.hidden = true;
+        siguiente.hidden = true;
+        reiniciar.hidden = false;
+        progreso.textContent = "5 de 5 pedidos servidos";
+        barra.setAttribute("aria-valuenow", "5");
+        barra.querySelector("span").style.width = "100%";
+        cuenta.innerHTML = "<strong>Regla del chef:</strong> elegir una opción de cada grupo son decisiones juntas (Y), así que se multiplican.";
+        fiesta(burger, 80);
+        return;
+      }
+      const mision = mazo[ronda];
+      const categorias = Object.keys(OPCIONES);
+      seleccion = Object.fromEntries(categorias.map((categoria) => [categoria, null]));
+      titulo.textContent = mision.titulo;
+      historia.textContent = mision.historia;
+      datos.textContent = mision.cantidades.map((cantidad, i) => `${OPCIONES[categorias[i]][0]}: ${cantidad} opciones`).join(" · ");
+      filas.innerHTML = categorias.map((categoria, i) => `
+        <div class="jg-menu-fila"><b>${OPCIONES[categoria][0]}</b>
+          ${OPCIONES[categoria][1].slice(0, mision.cantidades[i]).map((opcion, indice) => `<button type="button" class="jg-chip" data-categoria="${categoria}" data-indice="${indice}" aria-pressed="false">${opcion}</button>`).join("")}
+        </div>`).join("");
+      burger.innerHTML = "<span>🍞</span><span>❔</span><span>❔</span><span>🍞</span><small>Elige un ingrediente por fila para armar tu muestra.</small>";
+      entrada.value = "";
+      entrada.hidden = false;
+      comprobar.hidden = false;
+      comprobar.disabled = false;
+      entrada.disabled = false;
+      siguiente.hidden = true;
+      mensaje.textContent = "";
+      mensaje.className = "jg-msg jg-burger-mensaje";
+      progreso.textContent = `Pedido ${ronda + 1} de ${misiones.length}`;
+      barra.setAttribute("aria-valuenow", String(acertadas));
+      barra.querySelector("span").style.width = `${acertadas / misiones.length * 100}%`;
+      cuenta.innerHTML = "Elige una opción de <strong>cada</strong> fila: pan <strong>Y</strong> relleno <strong>Y</strong> salsa.";
     }
     b.addEventListener("click", (e) => {
-      const c = e.target.closest(".jg-chip[data-f]");
-      if (c) { sel[c.dataset.f] = +c.dataset.i; pintar(); return; }
-      if (e.target.closest(".mas") && nSalsa < 6) { nSalsa++; pintar(true); fiesta(cuenta, 10); }
-      else if (e.target.closest(".menos") && nSalsa > 1) { nSalsa--; sel.salsa = Math.min(sel.salsa, nSalsa - 1); pintar(true); }
-      else if (e.target.closest(".azar")) { sel.pan = R(0, 2); sel.carne = R(0, 2); sel.salsa = R(0, nSalsa - 1); pintar(); }
+      const botonIngrediente = e.target.closest("[data-categoria]");
+      if (botonIngrediente) {
+        const grupo = botonIngrediente.dataset.categoria;
+        seleccion[grupo] = +botonIngrediente.dataset.indice;
+        filas.querySelectorAll(`[data-categoria="${grupo}"]`).forEach((boton) => boton.setAttribute("aria-pressed", String(boton === botonIngrediente)));
+        const elegido = (categoria) => seleccion[categoria] === null ? "❔" : OPCIONES[categoria][1][seleccion[categoria]];
+        burger.innerHTML = `<span>${elegido("pan")}</span><span>${elegido("relleno")}</span><span>${elegido("salsa")}</span><span>🍞</span><small>¡Tu hamburguesa va tomando forma!</small>`;
+        return;
+      }
+      if (e.target.closest(".jg-burger-siguiente")) {
+        mostrarMision();
+        return;
+      }
+      if (e.target.closest(".jg-burger-reiniciar")) {
+        prepararPartida();
+        return;
+      }
+      if (!e.target.closest(".jg-burger-comprobar")) return;
+      if (Object.values(seleccion).some((valor) => valor === null)) {
+        mensaje.textContent = "Elige un ingrediente de cada fila antes de servir el pedido.";
+        mensaje.className = "jg-msg jg-burger-mensaje jg-mal";
+        return;
+      }
+      const respuesta = Number(normaliza(entrada.value));
+      if (!respuesta) {
+        mensaje.textContent = "Calcula el total y escribe tu respuesta.";
+        mensaje.className = "jg-msg jg-burger-mensaje jg-mal";
+        return;
+      }
+      const total = mazo[ronda].cantidades.reduce((producto, cantidad) => producto * cantidad, 1);
+      if (respuesta !== total) {
+        mensaje.textContent = "¡El pedido no cuadra! Multiplica las opciones de pan × relleno × salsa.";
+        mensaje.className = "jg-msg jg-burger-mensaje jg-mal";
+        anima(filas, "sacude");
+        return;
+      }
+      acertadas++;
+      mensaje.textContent = `¡Pedido servido! ${mazo[ronda].cantidades.join(" × ")} = ${total} hamburguesas diferentes.`;
+      mensaje.className = "jg-msg jg-burger-mensaje jg-ok";
+      cuenta.innerHTML = `La palabra «Y» une los grupos, así que se multiplican: ${mazo[ronda].cantidades.join(" × ")} = <strong>${total}</strong>.`;
+      entrada.disabled = true;
+      comprobar.disabled = true;
+      barra.setAttribute("aria-valuenow", String(acertadas));
+      barra.querySelector("span").style.width = `${acertadas / misiones.length * 100}%`;
+      fiesta(burger, 26);
+      ronda++;
+      if (acertadas < misiones.length) siguiente.hidden = false;
+      else setTimeout(mostrarMision, ms(1100));
     });
-    pintar();
+    entrada.addEventListener("keydown", (e) => { if (e.key === "Enter") comprobar.click(); });
+    prepararPartida();
   }
 
   /* ---------- 1.5 EL SEMÁFORO DETECTIVE ---------- */
   function juego15(b) {
     const CASOS = [
-      ["Se entregan oro, plata y bronce entre 9 equipos.", 1, 0, "Las medallas son diferentes (orden sí) y solo se premian 3 de los 9."],
-      ["Se ordenan los 6 módulos de un sistema para desplegarlos todos.", 1, 1, "La secuencia importa y se ordenan todos los elementos."],
-      ["Se elige un comité de 4 personas entre 10.", 0, 0, "Todos hacen lo mismo: el orden no importa."],
-      ["7 corredores llegan a la meta y se anota la posición de cada uno.", 1, 1, "La posición importa y se ubican todos."],
-      ["Se escogen 3 sabores de helado entre 8.", 0, 0, "Son los mismos sabores sin importar el orden."],
-      ["De 8 pruebas se ejecutan 4 en una secuencia específica.", 1, 0, "La secuencia importa y no se ejecutan todas."],
-      ["Con los dígitos del 0 al 9 se forma un PIN de 4 cifras sin repetir.", 1, 0, "1234 ≠ 4321 (orden sí) y se usan solo 4 de los 10 dígitos."],
-      ["5 amigos se colocan en fila para una foto.", 1, 1, "El lugar importa y se ordenan los 5."],
-      ["Se eligen 2 de 6 estudiantes para revisar un módulo (misma tarea).", 0, 0, "No hay cargos distintos: el orden no importa."],
+      ["🏆 En una competencia de videojuegos, 1.º, 2.º y 3.º lugar reciben premios distintos entre 10 finalistas.", 1, 0, "Las posiciones son diferentes, importa el orden y solo se premian 3 finalistas: variación."],
+      ["🧩 Una desarrolladora debe ordenar los 6 pasos de una misión para que el juego funcione.", 1, 1, "El orden de los pasos importa y se usan los 6: permutación."],
+      ["🍕 Un grupo elige 3 ingredientes entre 9 para compartir una pizza; no hay ingrediente principal.", 0, 0, "Todos los ingredientes elegidos tienen el mismo papel; el orden no importa: combinación."],
+      ["🎤 En un concurso de talentos participan 7 artistas y se registra quién actúa primero, segundo y así hasta el último.", 1, 1, "Cada artista ocupa una posición distinta y participan los 7: permutación."],
+      ["🕵️ Un equipo selecciona 4 de 11 pistas para investigar un misterio; todas las pistas tienen la misma importancia.", 0, 0, "Solo importa cuáles 4 pistas se escogen, no el orden: combinación."],
+      ["🔐 Se crea una clave de 4 símbolos distintos a partir de 8 símbolos disponibles.", 1, 0, "Cambiar el orden crea otra clave y solo se usan 4 de los 8 símbolos: variación."],
+      ["⚽ La entrenadora elige capitán y subcapitán entre 12 jugadores.", 1, 0, "Los cargos son diferentes y solo se eligen 2 jugadores: variación."],
+      ["📚 Se acomodan 8 libros distintos en una repisa para decorar el salón.", 1, 1, "Cambiar el orden cambia la repisa y se acomodan todos los libros: permutación."],
+      ["🎒 Para una excursión se escogen 5 estudiantes de un salón de 18; todos tendrán la misma tarea.", 0, 0, "No hay cargos ni posiciones diferentes: combinación."],
+      ["🎬 De 9 cortos se eligen 3 para proyectarlos en una función, decidiendo el orden de presentación.", 1, 0, "El orden de proyección importa y solo se seleccionan 3 cortos: variación."],
+      ["🧪 Un laboratorio organiza los 5 pasos de un experimento usando todos una sola vez.", 1, 1, "Se ordenan todos los pasos y la secuencia importa: permutación."],
+      ["🎨 Una artista selecciona 2 colores de una paleta de 7 para pintar un mural; ninguno va primero.", 0, 0, "Solo importa qué colores se usan, no el orden: combinación."],
+      ["🏁 En una carrera de 8 drones se anotan los tres primeros puestos.", 1, 0, "Los puestos son distintos y solo se ordenan 3 de los 8 drones: variación."],
+      ["🗂️ Un sistema organiza sus 6 tareas pendientes en una cola, usando todas.", 1, 1, "El orden de ejecución importa y se usan todas las tareas: permutación."],
+      ["🎲 Se eligen 3 juegos de mesa de una colección de 10 para una tarde; todos se jugarán sin orden fijo.", 0, 0, "Solo importa qué juegos se seleccionan: combinación."],
     ];
     const NOM = { C: "Combinación", V: "Variación", P: "Permutación" };
     const FOR = { C: "C[n,r] = {n!}/{(n−r)! · r!}", V: "V[n,r] = {n!}/{(n−r)!}", P: "P(n) = n!" };
-    let mazo = [], racha = 0, caso, r, subio = false;
+    const TOTAL = 5;
+    let mazo = [], resueltos = 0, caso, r;
     const real = () => (caso[1] ? (caso[2] ? "P" : "V") : "C");
     const veredicto = () => (r.o === 0 ? "C" : r.o === 1 && r.t === 1 ? "P" : r.o === 1 && r.t === 0 ? "V" : null);
-    function siguiente() { if (!mazo.length) mazo = mezclar(CASOS); caso = mazo.pop(); r = { o: null, t: null, fin: null }; pintar(true); }
+    function siguiente() {
+      if (!mazo.length) {
+        caso = null;
+        b.querySelector(".cuerpo").innerHTML = `
+          <div class="jg-detective-final">
+            <span aria-hidden="true">🏅</span>
+            <h4>¡Caso cerrado, detective!</h4>
+            <p>Resuelves los ${TOTAL} casos y ya sabes distinguir las tres técnicas:</p>
+            <ul>
+              <li><strong>Combinación:</strong> no importa el orden.</li>
+              <li><strong>Variación:</strong> importa el orden y se eligen algunos elementos.</li>
+              <li><strong>Permutación:</strong> importa el orden y se usan todos.</li>
+            </ul>
+            <button type="button" class="jg-btn" data-a="reiniciar">Resolver otros 5 casos 🔄</button>
+          </div>`;
+        fiesta(b.querySelector(".jg-detective-final"), 80);
+        return;
+      }
+      caso = mazo.pop();
+      r = { o: null, t: null, fin: null };
+      pintar(true);
+    }
     function pintar(esNuevo) {
       const v = veredicto();
       const luz = (k, cls) => `<i class="${v === k ? cls : ""}"></i>`;
       const pres = (cond) => (cond ? ' aria-pressed="true"' : "");
       let fin = "";
-      if (r.fin === "ok") fin = `<p class="jg-msg jg-ok">✅ ¡Resuelto! Es <strong>${NOM[v]}</strong>. ${caso[3]}</p><div class="jg-formula">${mt(FOR[v])}</div><div class="jg-fila"><button type="button" class="jg-btn" data-a="sig">Siguiente caso →</button></div>`;
-      if (r.fin === "mal") fin = `<p class="jg-msg jg-mal">🤔 El detective duda… ¿cambiar el orden cambia el resultado? ¿se usan todos los elementos?</p><div class="jg-fila"><button type="button" class="jg-btn" data-a="otra">Intentar de nuevo</button></div>`;
+      if (r.fin === "ok") fin = `
+        <div class="jg-detective-explicacion">
+          <p class="jg-msg jg-ok">✅ ¡Caso ${resueltos} de ${TOTAL} resuelto! Es <strong>${NOM[v]}</strong>.</p>
+          <p>${caso[3]}</p>
+          <div class="jg-formula">${mt(FOR[v])}</div>
+          <p><strong>Regla rápida:</strong> ${v === "C" ? "el orden no importa → combinación." : v === "V" ? "el orden importa y se eligen algunos → variación." : "el orden importa y se usan todos → permutación."}</p>
+          ${resueltos < TOTAL ? '<button type="button" class="jg-btn" data-a="sig">Siguiente caso →</button>' : '<button type="button" class="jg-btn" data-a="sig">Ver resultado final 🏁</button>'}
+        </div>`;
+      if (r.fin === "mal") fin = `<div class="jg-detective-error"><p class="jg-msg jg-mal">🤔 ¡El detective encontró una pista que no cuadra!</p><p>Recuerda: primero pregunta si importa el orden. Si importa, averigua si se usan todos los elementos o solo algunos.</p><button type="button" class="jg-btn" data-a="otra">Revisar este mismo caso</button></div>`;
       b.querySelector(".cuerpo").innerHTML = `
+        <p class="jg-detective-progreso">🗂️ Caso ${resueltos + (r.fin === "ok" ? 0 : 1)} de ${TOTAL}</p>
+        <div class="jg-detective-barra" role="progressbar" aria-label="Casos resueltos" aria-valuemin="0" aria-valuemax="${TOTAL}" aria-valuenow="${resueltos}"><span style="width:${resueltos / TOTAL * 100}%"></span></div>
         <p class="jg-caso ${esNuevo ? "nuevo" : r.fin || ""}">📁 ${caso[0]}</p>
+        <p class="jg-detective-pista">🧠 Pista: un equipo con cargos distintos sí tiene orden; un grupo con la misma tarea no.</p>
         <div class="jg-semaforo" aria-label="Semáforo del veredicto">${luz("C", "on-v")}${luz("V", "on-a")}${luz("P", "on-r")}</div>
-        <p class="jg-nota jg-centro">🟢 Combinación · 🟡 Variación · 🔴 Permutación</p>
-        <div class="jg-fila"><b>¿Importa el orden?</b><button type="button" class="jg-chip" data-q="o1"${pres(r.o === 1)}>Sí</button><button type="button" class="jg-chip" data-q="o0"${pres(r.o === 0)}>No</button></div>
-        ${r.o === 1 ? `<div class="jg-fila"><b>¿Se usan todos los elementos?</b><button type="button" class="jg-chip" data-q="t1"${pres(r.t === 1)}>Sí</button><button type="button" class="jg-chip" data-q="t0"${pres(r.t === 0)}>No</button></div>` : ""}
+        <p class="jg-nota jg-centro">🟢 Combinación (orden no) · 🟡 Variación (orden sí, algunos) · 🔴 Permutación (orden sí, todos)</p>
+        ${r.fin ? "" : `<div class="jg-fila"><b>1. ¿Importa el orden?</b><button type="button" class="jg-chip" data-q="o1"${pres(r.o === 1)}>Sí</button><button type="button" class="jg-chip" data-q="o0"${pres(r.o === 0)}>No</button></div>`}
+        ${!r.fin && r.o === 1 ? `<div class="jg-fila"><b>2. ¿Se usan todos los elementos?</b><button type="button" class="jg-chip" data-q="t1"${pres(r.t === 1)}>Sí</button><button type="button" class="jg-chip" data-q="t0"${pres(r.t === 0)}>No</button></div>` : ""}
         ${fin}
-        <p class="jg-racha"><span class="llama${subio ? " sube" : ""}">🔥</span> Racha: ${racha} / 5 ${racha >= 5 ? '<span class="jg-placa">🕵️ Placa de detective</span>' : ""}</p>`;
-      subio = false;
+        <p class="jg-racha">🔎 Casos resueltos: ${resueltos} / ${TOTAL}</p>`;
     }
-    b.insertAdjacentHTML("beforeend", '<p class="jg-intro">Responde las preguntas del detective. 5 aciertos seguidos = placa.</p><div class="cuerpo"></div>');
+    b.insertAdjacentHTML("beforeend", '<p class="jg-intro">¡Ayuda a la detective a cerrar cinco casos! En cada uno decide si el orden importa y, si importa, si se usan todos los elementos. Los cinco casos no se repiten durante la partida.</p><div class="cuerpo"></div>');
     b.addEventListener("click", (e) => {
       const q = e.target.closest("[data-q]"), a = e.target.closest("[data-a]");
-      if (a) { if (a.dataset.a === "sig") siguiente(); else { r = { o: null, t: null, fin: null }; pintar(); } return; }
+      if (a) {
+        if (a.dataset.a === "reiniciar") {
+          resueltos = 0;
+          mazo = mezclar(CASOS).slice(0, TOTAL);
+          siguiente();
+        } else if (a.dataset.a === "sig") siguiente();
+        else { r = { o: null, t: null, fin: null }; pintar(); }
+        return;
+      }
       if (!q || r.fin === "ok") return;
       const [k, val] = [q.dataset.q[0], +q.dataset.q[1]];
       r.fin = null;
       if (k === "o") { r.o = val; r.t = null; } else r.t = val;
       const v = veredicto();
       if (v) {
-        if (v === real()) { racha++; r.fin = "ok"; subio = true; } else { racha = 0; r.fin = "mal"; }
+        if (v === real()) { resueltos++; r.fin = "ok"; } else { r.fin = "mal"; }
       }
       pintar();
-      if (r.fin === "ok") fiesta(b.querySelector(".jg-semaforo"), racha === 5 ? 60 : 18);
+      if (r.fin === "ok") fiesta(b.querySelector(".jg-semaforo"), resueltos === TOTAL ? 70 : 18);
     });
+    mazo = mezclar(CASOS).slice(0, TOTAL);
     siguiente();
   }
 
   /* ---------- 1.6 MESA GIRATORIA Y LETRAS GEMELAS (dos pestañas) ---------- */
   function juego16(b) {
     b.innerHTML = `
+      <p class="jg-intro">¡Reto doble! Resuelve cinco misiones para el equipo de fiestas: aprende a contar mesas redondas y arreglos de letras gemelas.</p>
+      <p class="jg-reto-progreso circular-progreso"></p>
+      <div class="jg-reto-barra circular-barra" role="progressbar" aria-label="Misiones resueltas" aria-valuemin="0" aria-valuemax="5" aria-valuenow="0"><span></span></div>
+      <section class="jg-circular-reto">
+        <p class="jg-circular-pregunta"></p>
+        <p class="jg-circular-formula"></p>
+        <label class="jg-burger-respuesta">¿Cuántas formas distintas?<input class="jg-circular-respuesta" inputmode="numeric" placeholder="Escribe el total" aria-label="Número de formas"></label>
+        <button type="button" class="jg-btn circular-comprobar">Resolver misión 🧩</button>
+        <p class="jg-msg circular-mensaje" role="status" aria-live="polite"></p>
+        <button type="button" class="jg-btn circular-siguiente" hidden>Siguiente misión →</button>
+        <button type="button" class="jg-btn circular-reiniciar" hidden>Otra partida 🔄</button>
+      </section>
+      <details class="jg-laboratorio-libre"><summary>¿Quieres experimentar libremente? Abre el laboratorio</summary>
       <div class="jg-tabs" role="tablist">
         <button type="button" class="jg-tab on" role="tab" aria-selected="true" data-p="1">🪑 Mesa giratoria</button>
         <button type="button" class="jg-tab" role="tab" aria-selected="false" data-p="2">🔤 Letras gemelas</button>
@@ -1388,7 +2098,112 @@ mostrar();
         <p class="jg-msg letras-msg" role="status"></p>
         <div class="letras-barra">${BARRA}</div>
         <div class="jg-formula"></div>
-      </div>`;
+      </div>
+      </details>`;
+
+    const mesas = [4, 5, 6, 7, 8].map((personas) => ({
+      tipo: "mesa",
+      pregunta: `🪑 ${personas} amigos se sientan alrededor de una mesa redonda. Si girar la mesa no crea un orden nuevo, ¿cuántos acomodos distintos hay?`,
+      formula: `(${personas}−1)! = ${personas - 1}!`,
+      respuesta: fa(personas - 1),
+      explicacion: `En una mesa circular fijamos a una persona para no contar las rotaciones repetidas. Quedan ${personas - 1} personas para ordenar: (${personas}−1)! = ${fa(personas - 1)}.`,
+    }));
+    const letras = [
+      ["ANA", "3!/2!", 3, "ANA tiene tres letras y dos A gemelas: 3!/2! = 3."],
+      ["PAPA", "4!/(2!·2!)", 6, "PAPA tiene dos P y dos A repetidas: 4!/(2!·2!) = 6."],
+      ["SALA", "4!/2!", 12, "SALA tiene dos A gemelas: 4!/2! = 12."],
+      ["BANANA", "6!/(3!·2!)", 60, "BANANA tiene tres A y dos N: 6!/(3!·2!) = 60."],
+      ["LLAMA", "5!/(2!·2!)", 30, "LLAMA tiene dos L y dos A: 5!/(2!·2!) = 30."],
+    ].map(([palabra, formula, respuesta, explicacion]) => ({
+      tipo: "letras",
+      pregunta: `🔤 ¿Cuántos arreglos diferentes pueden formarse con las letras de ${palabra}? Las letras iguales son gemelas y no se distinguen.`,
+      formula,
+      respuesta,
+      explicacion,
+    }));
+    const misionesMesa = mezclar(mesas).slice(0, 3);
+    const misionesLetras = mezclar(letras).slice(0, 2);
+    let mazoCircular = mezclar([...misionesMesa, ...misionesLetras]);
+    let rondaCircular = 0;
+    let circularResuelto = false;
+    const circularPregunta = b.querySelector(".jg-circular-pregunta");
+    const circularFormula = b.querySelector(".jg-circular-formula");
+    const circularEntrada = b.querySelector(".jg-circular-respuesta");
+    const circularComprobar = b.querySelector(".circular-comprobar");
+    const circularMensaje = b.querySelector(".circular-mensaje");
+    const circularSiguiente = b.querySelector(".circular-siguiente");
+    const circularReiniciar = b.querySelector(".circular-reiniciar");
+    const circularProgreso = b.querySelector(".circular-progreso");
+    const circularBarra = b.querySelector(".circular-barra");
+    function mostrarMisionCircular() {
+      if (rondaCircular === mazoCircular.length) {
+        circularPregunta.textContent = "¡El equipo de fiestas completó sus cinco misiones! 🎉";
+        circularFormula.textContent = "¡Ya sabes contar mesas redondas y letras repetidas!";
+        circularEntrada.hidden = true;
+        circularComprobar.hidden = true;
+        circularSiguiente.hidden = true;
+        circularReiniciar.hidden = false;
+        circularProgreso.textContent = "5 de 5 misiones";
+        circularBarra.setAttribute("aria-valuenow", "5");
+        circularBarra.querySelector("span").style.width = "100%";
+        fiesta(b.querySelector(".jg-circular-reto"), 80);
+        return;
+      }
+      const mision = mazoCircular[rondaCircular];
+      circularPregunta.textContent = mision.pregunta;
+      circularFormula.textContent = mision.tipo === "mesa"
+        ? "Pista: fija a una persona para que las rotaciones no se repitan."
+        : "Pista: divide el factorial total entre los factoriales de las letras gemelas.";
+      circularEntrada.value = "";
+      circularEntrada.disabled = false;
+      circularEntrada.hidden = false;
+      circularComprobar.disabled = false;
+      circularComprobar.hidden = false;
+      circularSiguiente.hidden = true;
+      circularReiniciar.hidden = true;
+      circularMensaje.textContent = "";
+      circularMensaje.className = "jg-msg circular-mensaje";
+      circularProgreso.textContent = `Misión ${rondaCircular + 1} de 5 · ${mision.tipo === "mesa" ? "mesa circular" : "letras gemelas"}`;
+      circularBarra.setAttribute("aria-valuenow", String(rondaCircular));
+      circularBarra.querySelector("span").style.width = `${rondaCircular / 5 * 100}%`;
+      circularResuelto = false;
+    }
+    function revisarMisionCircular() {
+      if (circularResuelto) return;
+      const respuesta = Number(normaliza(circularEntrada.value));
+      if (!respuesta) {
+        circularMensaje.textContent = "Escribe cuántos acomodos distintos encontraste.";
+        circularMensaje.className = "jg-msg circular-mensaje jg-mal";
+        return;
+      }
+      const mision = mazoCircular[rondaCircular];
+      if (respuesta !== mision.respuesta) {
+        circularMensaje.textContent = "¡Casi! Usa la pista para elegir la fórmula y vuelve a intentarlo.";
+        circularMensaje.className = "jg-msg circular-mensaje jg-mal";
+        anima(circularEntrada, "sacude");
+        return;
+      }
+      circularResuelto = true;
+      circularMensaje.innerHTML = `✅ ¡Misión resuelta! ${mision.explicacion}<br><strong>${mision.formula} = ${mision.respuesta}</strong>`;
+      circularMensaje.className = "jg-msg circular-mensaje jg-ok";
+      circularEntrada.disabled = true;
+      circularComprobar.disabled = true;
+      rondaCircular++;
+      circularBarra.setAttribute("aria-valuenow", String(rondaCircular));
+      circularBarra.querySelector("span").style.width = `${rondaCircular / 5 * 100}%`;
+      fiesta(circularMensaje, 22);
+      if (rondaCircular < 5) circularSiguiente.hidden = false;
+      else setTimeout(mostrarMisionCircular, ms(1200));
+    }
+    circularComprobar.addEventListener("click", revisarMisionCircular);
+    circularEntrada.addEventListener("keydown", (e) => { if (e.key === "Enter") revisarMisionCircular(); });
+    circularSiguiente.addEventListener("click", mostrarMisionCircular);
+    circularReiniciar.addEventListener("click", () => {
+      rondaCircular = 0;
+      mazoCircular = mezclar([...mezclar(mesas).slice(0, 3), ...mezclar(letras).slice(0, 2)]);
+      mostrarMisionCircular();
+    });
+    mostrarMisionCircular();
 
     // Pestañas
     b.querySelector(".jg-tabs").addEventListener("click", (e) => {
@@ -1502,35 +2317,269 @@ mostrar();
     usar("PAPA");
   }
 
-  /* ---------- Montaje: un juego por subtema ---------- */
-  const JUEGOS = [
-    ["🔐 Juega y descubre: la caja fuerte", juego11, "--c2"],
-    ["🎲 Juega y descubre: dominó en cadena", juego12, "--c1"],
-    ["👾 Juega y descubre: el monstruo come-factoriales", juego13, "--c5"],
-    ["🍔 Juega y descubre: armador de hamburguesas", juego14, "--c4"],
-    ["🕵️ Juega y descubre: el semáforo detective", juego15, "--c3"],
-    ["🪑 Juega y descubre: mesa y letras gemelas", juego16, "--c1"],
-  ];
-  const cont = document.getElementById("detalle-contenido");
-  if (!cont) return;
+  function retoHuevo(b) {
+    b.innerHTML = `
+      <p class="jg-intro">Cada acierto hace crecer el huevo de tu perfil. Responde cinco preguntas para ayudar a nacer al pollito.</p>
+      <div class="reto-huevo-escena" aria-live="polite">
+        <button class="reto-huevo-avatar" type="button" aria-label="Pollito del reto">
+          <span class="reto-huevo-dialogo" role="status" hidden></span>
+          <span class="reto-huevo-cascaron" aria-hidden="true">🥚</span>
+          <svg class="reto-huevo-grieta grieta-1" viewBox="0 0 18 42" aria-hidden="true" hidden><path d="M11 1 6 10 13 15 5 25 10 30 4 41"/></svg>
+          <svg class="reto-huevo-grieta grieta-2" viewBox="0 0 18 42" aria-hidden="true" hidden><path d="M11 1 6 10 13 15 5 25 10 30 4 41"/></svg>
+          <svg class="reto-huevo-grieta grieta-3" viewBox="0 0 18 42" aria-hidden="true" hidden><path d="M11 1 6 10 13 15 5 25 10 30 4 41"/></svg>
+          <svg class="reto-huevo-grieta grieta-4" viewBox="0 0 18 42" aria-hidden="true" hidden><path d="M11 1 6 10 13 15 5 25 10 30 4 41"/></svg>
+          <img class="reto-huevo-pollito" src="pollito.gif" alt="" hidden>
+        </button>
+        <strong class="reto-huevo-conteo">0% · 0 de 5 aciertos</strong>
+        <div class="barra"><div class="relleno"></div></div>
+        <p class="reto-huevo-cuenta-atras" aria-live="assertive" hidden></p>
+      </div>
+      <p class="jg-msg reto-huevo-mensaje" role="status">¿Listo para comenzar?</p>
+      <button class="jg-btn reto-huevo-iniciar" type="button">¡Empezar el reto! 🐣</button>
+      <section class="reto-huevo-pregunta" hidden>
+        <p class="jg-sub reto-huevo-tema"></p>
+        <p class="jg-intro reto-huevo-enunciado"></p>
+        <div class="jg-resp">
+          <input class="reto-huevo-respuesta" type="text" autocomplete="off" placeholder="Tu respuesta" aria-label="Respuesta al reto del huevo">
+          <button class="jg-btn reto-huevo-comprobar" type="button">Comprobar</button>
+        </div>
+        <p class="jg-msg reto-huevo-resultado" role="status"></p>
+        <details class="reto-huevo-pista" hidden><summary>Ver explicación</summary><div></div></details>
+        <button class="jg-btn reto-huevo-siguiente" type="button" hidden>Siguiente pregunta →</button>
+      </section>
+      <button class="jg-btn reto-huevo-reiniciar" type="button" hidden>Jugar otra vez 🔄</button>`;
 
-  function montar() {
-    const m = location.hash.match(/^#\/(\d+)$/);
-    if (!m || !cont.children.length || cont.querySelector(".caja-juego")) return;
-    const j = JUEGOS[parseInt(m[1], 10) - 1];
-    if (!j) return;
-    const caja = document.createElement("section");
-    caja.className = "caja caja-juego";
-    caja.style.setProperty("--cc", `var(${j[2]})`);
-    caja.style.setProperty("--i", 5);
-    caja.innerHTML = `<h3 class="caja-titulo">${j[0]}</h3>`;
-    const ref = cont.querySelector(".caja-aplica");
-    if (ref) ref.after(caja); else cont.appendChild(caja);
-    const cuerpo = document.createElement("div");
-    cuerpo.className = "jg-cuerpo";
-    caja.appendChild(cuerpo);
-    j[1](cuerpo);
+    const escena = b.querySelector(".reto-huevo-escena");
+    const avatar = b.querySelector(".reto-huevo-avatar");
+    const cascaron = b.querySelector(".reto-huevo-cascaron");
+    const grietas = b.querySelectorAll(".reto-huevo-grieta");
+    const pollito = b.querySelector(".reto-huevo-pollito");
+    const dialogo = b.querySelector(".reto-huevo-dialogo");
+    const conteo = b.querySelector(".reto-huevo-conteo");
+    const barra = b.querySelector(".relleno");
+    const cuentaAtrasEl = b.querySelector(".reto-huevo-cuenta-atras");
+    const mensaje = b.querySelector(".reto-huevo-mensaje");
+    const comenzar = b.querySelector(".reto-huevo-iniciar");
+    const pregunta = b.querySelector(".reto-huevo-pregunta");
+    const tema = b.querySelector(".reto-huevo-tema");
+    const enunciado = b.querySelector(".reto-huevo-enunciado");
+    const respuesta = b.querySelector(".reto-huevo-respuesta");
+    const comprobar = b.querySelector(".reto-huevo-comprobar");
+    const resultado = b.querySelector(".reto-huevo-resultado");
+    const pista = b.querySelector(".reto-huevo-pista");
+    const siguiente = b.querySelector(".reto-huevo-siguiente");
+    const reiniciar = b.querySelector(".reto-huevo-reiniciar");
+    const firmas = new Set();
+    let temasPartida = [];
+    let aciertos = 0;
+    let actual = null;
+    let temporizadorCuentaAtras;
+    let temporizadorInicio;
+    let limpiarDialogo;
+
+    function actualizarEscena() {
+      const progreso = aciertos * 20;
+      grietas.forEach((grieta, indice) => { grieta.toggleAttribute("hidden", aciertos < indice + 1 || aciertos >= 5); });
+      cascaron.hidden = aciertos >= 5;
+      pollito.hidden = aciertos < 5;
+      avatar.setAttribute("aria-label", aciertos >= 5 ? "Pollito nacido en el reto" : `Huevo del reto: ${progreso}%`);
+      conteo.textContent = `${progreso}% · ${aciertos} de 5 aciertos`;
+      barra.style.width = `${progreso}%`;
+      escena.classList.toggle("reto-huevo-nacio", aciertos >= 5);
+    }
+
+    function preguntaAleatoria() {
+      const indiceTema = temasPartida.shift();
+      const generadores = GEN[indiceTema];
+      for (let intento = 0; intento < 100; intento++) {
+        const ejercicio = generadores[R(0, generadores.length - 1)]();
+        const firma = `${indiceTema}-${ejercicio.firma}`;
+        if (firmas.has(firma)) continue;
+        firmas.add(firma);
+        return { indiceTema, ejercicio };
+      }
+      const ejercicio = generadores[0]();
+      firmas.add(`${indiceTema}-${ejercicio.firma}`);
+      return { indiceTema, ejercicio };
+    }
+
+    function mostrarPregunta() {
+      actual = preguntaAleatoria();
+      tema.textContent = modulo.subtemas[actual.indiceTema].titulo;
+      enunciado.innerHTML = actual.ejercicio.enunciado;
+      respuesta.value = "";
+      respuesta.disabled = false;
+      comprobar.disabled = false;
+      resultado.textContent = "";
+      resultado.className = "jg-msg reto-huevo-resultado";
+      pista.hidden = true;
+      pista.open = false;
+      pista.querySelector("div").innerHTML = actual.ejercicio.sol.slice(0, -1).map((paso) => `<p>${paso}</p>`).join("");
+      siguiente.hidden = true;
+      pregunta.hidden = false;
+      respuesta.focus();
+    }
+
+    function iniciar() {
+      clearInterval(temporizadorCuentaAtras);
+      clearTimeout(temporizadorInicio);
+      if (limpiarDialogo) limpiarDialogo();
+      firmas.clear();
+      temasPartida = mezclar(GEN.map((_, indice) => indice)).slice(0, 5);
+      aciertos = 0;
+      actualizarEscena();
+      comenzar.hidden = true;
+      reiniciar.hidden = true;
+      pregunta.hidden = true;
+      mensaje.textContent = "¡Prepárate! En unos segundos comenzamos. 💛";
+      cuentaAtrasEl.hidden = false;
+      let cuenta = 3;
+      cuentaAtrasEl.textContent = String(cuenta);
+      limpiarDialogo = iniciarDialogoCiclico(dialogo, [
+        "¡Confío en ti! Un paso a la vez. 💛",
+        "Cada respuesta te acerca a la meta. ⭐",
+        "No tengas miedo de equivocarte; así también se aprende. 🌈",
+        "¡Tú puedes ayudarme a nacer! 🐣",
+      ]);
+      temporizadorCuentaAtras = setInterval(() => {
+        cuenta--;
+        cuentaAtrasEl.textContent = String(cuenta);
+        if (cuenta > 0) return;
+        clearInterval(temporizadorCuentaAtras);
+        mensaje.textContent = "¡Empecemos! 🐣";
+        dialogo.textContent = "¡Empecemos! ¡Sé que lo harás genial! 🎉";
+        dialogo.hidden = false;
+        cascaron.hidden = true;
+        pollito.hidden = false;
+        avatar.setAttribute("aria-label", "El pollito saluda: ¡Empecemos!");
+        temporizadorInicio = setTimeout(() => {
+          pollito.hidden = true;
+          cascaron.hidden = false;
+          avatar.setAttribute("aria-label", "Huevo del reto: 0%");
+          cuentaAtrasEl.hidden = true;
+          mensaje.textContent = "Cada acierto romperá un poquito el cascarón.";
+          mostrarPregunta();
+        }, 750);
+      }, 1000);
+    }
+
+    function verificar() {
+      if (!actual || comprobar.disabled) return;
+      const valor = normaliza(respuesta.value);
+      if (!valor) {
+        resultado.textContent = "Escribe tu respuesta primero.";
+        resultado.className = "jg-msg reto-huevo-resultado jg-mal";
+        return;
+      }
+      const correcta = normaliza(actual.ejercicio.respuesta);
+      if (valor !== correcta && !(actual.ejercicio.contiene && valor.includes(correcta))) {
+        resultado.textContent = "¡Casi! Revisa la explicación y vuelve a intentarlo.";
+        resultado.className = "jg-msg reto-huevo-resultado jg-mal";
+        pista.hidden = false;
+        anima(pregunta, "sacude");
+        return;
+      }
+
+      aciertos++;
+      registrarCrecimientoPollito(escena);
+      actualizarEscena();
+      if (aciertos < 5) anima(avatar, "reto-huevo-golpe");
+      respuesta.disabled = true;
+      comprobar.disabled = true;
+      resultado.textContent = "¡Correcto! El pollito ya está un poquito más cerca. 🎉";
+      resultado.className = "jg-msg reto-huevo-resultado jg-ok";
+      confeti(escena, aciertos === 5 ? 60 : 18);
+      if (aciertos === 5) {
+        actual = null;
+        pregunta.hidden = true;
+        actualizarEscena();
+        dialogo.textContent = "¡Lo logramos! ¡Nací y estoy muy orgulloso de ti! 🐣💛";
+        dialogo.hidden = false;
+        mensaje.textContent = "¡Lo lograste! ¡El pollito nació en este reto! 🐣";
+        confeti(escena, 90);
+        reiniciar.hidden = false;
+      } else {
+        siguiente.hidden = false;
+      }
+    }
+
+    comenzar.addEventListener("click", iniciar);
+    comprobar.addEventListener("click", verificar);
+    respuesta.addEventListener("keydown", (evento) => {
+      if (evento.key === "Enter") verificar();
+    });
+    siguiente.addEventListener("click", mostrarPregunta);
+    reiniciar.addEventListener("click", iniciar);
+    return () => {
+      clearInterval(temporizadorCuentaAtras);
+      clearTimeout(temporizadorInicio);
+      if (limpiarDialogo) limpiarDialogo();
+    };
   }
-  new MutationObserver(montar).observe(cont, { childList: true });
-  montar();
+
+  const JUEGOS = [
+    { titulo: "Reto del huevo: ¡ayúdalo a nacer!", descripcion: "Responde preguntas de cinco temas distintos, rompe el cascarón y ayuda a nacer al pollito.", icono: "🐣", color: "--c4", iniciar: retoHuevo },
+    { titulo: "Caja fuerte de claves", descripcion: "Resuelve cinco retos distintos; un error reinicia el candado con códigos nuevos.", icono: "🔐", color: "--c2", iniciar: juego11 },
+    { titulo: "Dominó en cadena", descripcion: "Resuelve cinco desafíos factoriales y derriba una fila de fichas con cada acierto.", icono: "🎲", color: "--c1", iniciar: juego12 },
+    { titulo: "Monstruo come-factoriales", descripcion: "Resuelve cinco simplificaciones, cuida tus cinco vidas y alimenta al monstruo.", icono: "👾", color: "--c5", iniciar: juego13 },
+    { titulo: "Armador de hamburguesas", descripcion: "Acepta cinco pedidos y multiplica las opciones para convertirte en chef combinatorio.", icono: "🍔", color: "--c4", iniciar: juego14 },
+    { titulo: "Semáforo detective", descripcion: "Resuelve cinco misterios únicos y aprende cuándo usar combinación, variación o permutación.", icono: "🕵️", color: "--c3", iniciar: juego15 },
+    { titulo: "Mesa giratoria y letras gemelas", descripcion: "Supera cinco misiones de mesas circulares y letras repetidas; luego experimenta en el laboratorio.", icono: "🔤", color: "--c1", iniciar: juego16 },
+  ];
+  const menu = document.getElementById("minijuegos-menu");
+  const activo = document.getElementById("minijuego-activo");
+  const host = document.getElementById("minijuego-cuerpo");
+  const titulo = document.getElementById("minijuego-titulo");
+  if (!menu || !activo || !host || !titulo) return;
+  let limpiarJuegoActivo;
+  function animarMenu() {
+    menu.classList.remove("minijuegos-entrada");
+    void menu.offsetWidth;
+    menu.classList.add("minijuegos-entrada");
+  }
+
+  menu.innerHTML = JUEGOS.map((juego, i) => `
+    <button type="button" class="minijuego-tarjeta" data-juego="${i}" style="--cc:var(${juego.color});--i:${i}">
+      <span class="minijuego-icono" aria-hidden="true">${juego.icono}</span>
+      <span class="minijuego-texto"><strong>${juego.titulo}</strong><small>${juego.descripcion}</small></span>
+      <span class="minijuego-flecha" aria-hidden="true">Jugar →</span>
+    </button>`).join("");
+
+  menu.addEventListener("click", (evento) => {
+    const boton = evento.target.closest("[data-juego]");
+    if (!boton) return;
+    const juego = JUEGOS[Number(boton.dataset.juego)];
+    if (!juego) return;
+    if (limpiarJuegoActivo) limpiarJuegoActivo();
+    titulo.textContent = `${juego.icono} ${juego.titulo}`;
+    activo.style.setProperty("--cc", `var(${juego.color})`);
+    host.replaceChildren();
+    const limpieza = juego.iniciar(host);
+    limpiarJuegoActivo = typeof limpieza === "function" ? limpieza : undefined;
+    menu.hidden = true;
+    activo.hidden = false;
+    activo.scrollIntoView({ behavior: reducido ? "auto" : "smooth", block: "start" });
+  });
+
+  const volver = document.getElementById("minijuegos-volver");
+  if (!volver) return;
+  volver.addEventListener("click", () => {
+    if (limpiarJuegoActivo) limpiarJuegoActivo();
+    limpiarJuegoActivo = undefined;
+    activo.hidden = true;
+    host.replaceChildren();
+    menu.hidden = false;
+    menu.querySelector("button")?.focus();
+    animarMenu();
+    window.scrollTo({ top: 0, behavior: reducido ? "auto" : "smooth" });
+  });
+  window.addEventListener("hashchange", () => {
+    if (location.hash === "#/juegos") {
+      if (!menu.hidden) animarMenu();
+      return;
+    }
+    if (limpiarJuegoActivo) limpiarJuegoActivo();
+    limpiarJuegoActivo = undefined;
+  });
+  if (location.hash === "#/juegos" && !menu.hidden) animarMenu();
 })();
