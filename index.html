@@ -17,10 +17,15 @@
         <button class="mascota-avatar" id="mascota-avatar" type="button" aria-label="Saluda a tu mascota" title="Tócame para saludar">
           <img class="mascota-pollito" id="mascota-pollito" src="pollito.gif" alt="" hidden>
           <span id="mascota-emoji" aria-hidden="true">🥚</span>
+          <svg class="mascota-grieta grieta-1" data-etapa="1" viewBox="0 0 18 42" aria-hidden="true" hidden><path d="M11 1 6 10 13 15 5 25 10 30 4 41"/></svg>
+          <svg class="mascota-grieta grieta-2" data-etapa="2" viewBox="0 0 18 42" aria-hidden="true" hidden><path d="M11 1 6 10 13 15 5 25 10 30 4 41"/></svg>
+          <svg class="mascota-grieta grieta-3" data-etapa="3" viewBox="0 0 18 42" aria-hidden="true" hidden><path d="M11 1 6 10 13 15 5 25 10 30 4 41"/></svg>
+          <svg class="mascota-grieta grieta-4" data-etapa="4" viewBox="0 0 18 42" aria-hidden="true" hidden><path d="M11 1 6 10 13 15 5 25 10 30 4 41"/></svg>
+          <svg class="mascota-grieta grieta-5" data-etapa="5" viewBox="0 0 18 42" aria-hidden="true" hidden><path d="M11 1 6 10 13 15 5 25 10 30 4 41"/></svg>
+          <output class="mascota-dialogo" id="mascota-mensaje" aria-live="polite">¡Hola! Me alegra verte. Vamos a crecer juntos. 💜</output>
         </button>
         <div class="mascota-info">
           <strong id="mascota-nombre">Tu mascota · Huevo</strong>
-          <output id="mascota-mensaje" aria-live="polite">¡Hola! Me alegra verte. Vamos a crecer juntos. 💜</output>
           <progress class="mascota-barra" id="mascota-barra" aria-label="Crecimiento del huevo" max="100" value="0">
             <span id="mascota-relleno"></span>
           </progress>
@@ -39,11 +44,11 @@
     </section>
   </main>
 
-  <aside class="pollito-companero" id="pollito-companero" aria-label="Tu pollito te acompaña" hidden>
+  <button class="pollito-companero" id="pollito-companero" type="button" aria-label="Tu pollito te acompaña" hidden>
     <span class="pollito-companero-huevo" id="pollito-companero-huevo" aria-hidden="true">🥚</span>
     <img src="pollito.gif" alt="" class="pollito-companero-img" id="pollito-companero-img" hidden>
     <output id="pollito-companero-mensaje" aria-live="polite"></output>
-  </aside>
+  </button>
 
   <script src="animacion.js"></script>
 </body>
